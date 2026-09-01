@@ -1,12 +1,16 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kniffel Extreme - P2P</title>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
 <style>
   :root{
     --felt-dark:#123027;
@@ -22,7 +26,9 @@
     --banner:#e8d97a;
     --banner-ink:#3a3212;
   }
+
   *{box-sizing:border-box;}
+
   body{
     margin:0;
     min-height:100vh;
@@ -32,7 +38,9 @@
     font-family:'Manrope',system-ui,sans-serif;
     padding:24px 14px 60px;
   }
+
   .wrap{max-width:980px;margin:0 auto;}
+
   h1{
     font-family:'Fraunces',serif;
     font-weight:700;
@@ -41,7 +49,14 @@
     letter-spacing:-0.01em;
     text-align:center;
   }
-  .sub{color:var(--ivory-dim);margin:0 0 20px;font-size:14px;text-align:center;}
+
+  .sub{
+    color:var(--ivory-dim);
+    margin:0 0 20px;
+    font-size:14px;
+    text-align:center;
+  }
+
   .card{
     background:rgba(244,239,223,0.05);
     border:1px solid rgba(244,239,223,0.14);
@@ -49,6 +64,7 @@
     padding:20px;
     margin-bottom:16px;
   }
+
   input[type=text]{
     font-family:'Manrope',sans-serif;
     font-size:15px;
@@ -60,9 +76,18 @@
     width:100%;
     margin-top:6px;
   }
-  input[type=text]::placeholder{color:rgba(244,239,223,0.4);}
-  label{font-size:13px;color:var(--ivory-dim);}
+
+  input[type=text]::placeholder{
+    color:rgba(244,239,223,0.4);
+  }
+
+  label{
+    font-size:13px;
+    color:var(--ivory-dim);
+  }
+
   .field{margin-bottom:14px;}
+
   button{
     font-family:'Manrope',sans-serif;
     font-weight:700;
@@ -73,536 +98,1977 @@
     cursor:pointer;
     transition:transform .08s ease, filter .15s ease;
   }
+
   button:active{transform:scale(0.97);}
   button:disabled{opacity:0.35;cursor:not-allowed;}
-  .btn-primary{background:var(--gold);color:#2a2110;width:100%;}
-  .btn-primary:hover:not(:disabled){filter:brightness(1.08);}
-  .btn-ghost{background:rgba(244,239,223,0.12);color:var(--ivory);font-size:13.5px;padding:9px 14px;}
-  .btn-ghost:hover:not(:disabled){background:rgba(244,239,223,0.2);}
-  .btn-red{background:var(--red);color:var(--ivory);font-size:13.5px;padding:9px 14px;}
-  .btn-red:hover:not(:disabled){background:var(--red-dim);}
-  .err{color:#e8a06b;font-size:14px;margin-top:8px;}
 
-  .board{display:grid;grid-template-columns:1fr;gap:16px;}
-  @media (min-width:760px){
-    .board{grid-template-columns:340px 1fr;align-items:start;}
+  .btn-primary{
+    background:var(--gold);
+    color:#2a2110;
+    width:100%;
   }
 
-  .players-row{display:flex;gap:22px;justify-content:center;margin-bottom:14px;}
-  .avatar-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .btn-primary:hover:not(:disabled){
+    filter:brightness(1.08);
+  }
+
+  .btn-ghost{
+    background:rgba(244,239,223,0.12);
+    color:var(--ivory);
+    font-size:13.5px;
+    padding:9px 14px;
+  }
+
+  .btn-ghost:hover:not(:disabled){
+    background:rgba(244,239,223,0.2);
+  }
+
+  .btn-red{
+    background:var(--red);
+    color:var(--ivory);
+    font-size:13.5px;
+    padding:9px 14px;
+  }
+
+  .btn-red:hover:not(:disabled){
+    background:var(--red-dim);
+  }
+
+  .err{
+    color:#e8a06b;
+    font-size:14px;
+    margin-top:8px;
+  }
+
+  .board{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:16px;
+  }
+
+  @media (min-width:760px){
+    .board{
+      grid-template-columns:340px 1fr;
+      align-items:start;
+    }
+  }
+
+  .players-row{
+    display:flex;
+    gap:22px;
+    justify-content:center;
+    margin-bottom:14px;
+  }
+
+  .avatar-wrap{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+  }
+
   .avatar{
-    width:64px;height:64px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    font-family:'Fraunces',serif;font-weight:700;font-size:26px;
+    width:64px;
+    height:64px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:'Fraunces',serif;
+    font-weight:700;
+    font-size:26px;
     color:#221a0c;
     box-shadow:0 3px 0 rgba(0,0,0,0.25), 0 5px 10px rgba(0,0,0,0.3);
     border:2px solid rgba(244,239,223,0.4);
   }
-  .avatar.gold{background:linear-gradient(160deg,#e7c876,var(--gold-dim));}
-  .avatar.red{background:linear-gradient(160deg,#d97a63,var(--red-dim));color:var(--ivory);}
-  .avatar.turn{box-shadow:0 0 0 3px var(--banner), 0 3px 0 rgba(0,0,0,0.25), 0 5px 10px rgba(0,0,0,0.3);}
-  .avatar-name{font-size:13px;color:var(--ivory-dim);}
-  .avatar-name.turn{color:var(--banner);font-weight:700;}
+
+  .avatar.gold{
+    background:linear-gradient(160deg,#e7c876,var(--gold-dim));
+  }
+
+  .avatar.red{
+    background:linear-gradient(160deg,#d97a63,var(--red-dim));
+    color:var(--ivory);
+  }
+
+  .avatar.turn{
+    box-shadow:
+      0 0 0 3px var(--banner),
+      0 3px 0 rgba(0,0,0,0.25),
+      0 5px 10px rgba(0,0,0,0.3);
+  }
+
+  .avatar-name{
+    font-size:13px;
+    color:var(--ivory-dim);
+  }
+
+  .avatar-name.turn{
+    color:var(--banner);
+    font-weight:700;
+  }
 
   .banner{
-    background:var(--banner);color:var(--banner-ink);
-    border-radius:10px;padding:13px 16px;font-size:14.5px;font-weight:600;
-    margin-bottom:16px;text-align:center;line-height:1.4;
+    background:var(--banner);
+    color:var(--banner-ink);
+    border-radius:10px;
+    padding:13px 16px;
+    font-size:14.5px;
+    font-weight:600;
+    margin-bottom:16px;
+    text-align:center;
+    line-height:1.4;
   }
 
   .dice-tray{
     position:relative;
-    display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;
-    padding:30px 14px;margin:0 0 16px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    justify-content:center;
+    align-items:center;
+    padding:30px 14px;
+    margin:0 0 16px;
     min-height:150px;
-    background:radial-gradient(ellipse at 50% 40%, rgba(0,0,0,0.25), rgba(0,0,0,0.1));
+    background:
+      radial-gradient(
+        ellipse at 50% 40%,
+        rgba(0,0,0,0.25),
+        rgba(0,0,0,0.1)
+      );
     border-radius:16px;
     border:1px solid rgba(244,239,223,0.1);
   }
+
   .die{
-    width:56px;height:56px;
+    width:56px;
+    height:56px;
     border-radius:10px;
-    display:flex;align-items:center;justify-content:center;
-    font-family:'Fraunces',serif;font-weight:700;font-size:23px;
-    background:var(--ivory);color:var(--ink);
-    box-shadow:0 4px 0 rgba(0,0,0,0.25), 0 6px 10px rgba(0,0,0,0.35);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:'Fraunces',serif;
+    font-weight:700;
+    font-size:23px;
+    background:var(--ivory);
+    color:var(--ink);
+    box-shadow:
+      0 4px 0 rgba(0,0,0,0.25),
+      0 6px 10px rgba(0,0,0,0.35);
     cursor:pointer;
     user-select:none;
-    transition:transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+    transition:
+      transform .15s ease,
+      box-shadow .15s ease,
+      opacity .15s ease;
   }
-  .die.red{background:linear-gradient(160deg, #d05a44, var(--red));color:var(--ivory);}
-  .die.held{opacity:0.5;box-shadow:0 1px 0 rgba(0,0,0,0.2);}
-  .die.empty{background:rgba(244,239,223,0.15);color:transparent;cursor:default;box-shadow:none;}
+
+  .die.red{
+    background:linear-gradient(160deg,#d05a44,var(--red));
+    color:var(--ivory);
+  }
+
+  .die.held{
+    opacity:0.5;
+    box-shadow:0 1px 0 rgba(0,0,0,0.2);
+  }
+
+  .die.empty{
+    background:rgba(244,239,223,0.15);
+    color:transparent;
+    cursor:default;
+    box-shadow:none;
+  }
 
   .controls{margin-bottom:10px;}
-  .controls-secondary{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:12px;}
-  .meta{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;font-size:13px;color:var(--ivory-dim);margin-bottom:6px;}
-  .meta b{color:var(--ivory);}
-  .chip{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--gold);margin-right:3px;}
-  .chip.spent{background:rgba(244,239,223,0.15);}
 
-  table{width:100%;border-collapse:collapse;font-size:13.5px;}
-  th,td{padding:8px 8px;text-align:left;border-bottom:1px solid rgba(244,239,223,0.09);}
-  th{font-weight:700;color:var(--ivory-dim);font-size:12px;}
+  .controls-secondary{
+    display:flex;
+    gap:8px;
+    justify-content:center;
+    flex-wrap:wrap;
+    margin-bottom:12px;
+  }
+
+  .meta{
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap;
+    justify-content:center;
+    font-size:13px;
+    color:var(--ivory-dim);
+    margin-bottom:6px;
+  }
+
+  .meta b{color:var(--ivory);}
+
+  .chip{
+    display:inline-block;
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    background:var(--gold);
+    margin-right:3px;
+  }
+
+  .chip.spent{
+    background:rgba(244,239,223,0.15);
+  }
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13.5px;
+  }
+
+  th,td{
+    padding:8px 8px;
+    text-align:left;
+    border-bottom:1px solid rgba(244,239,223,0.09);
+  }
+
+  th{
+    font-weight:700;
+    color:var(--ivory-dim);
+    font-size:12px;
+  }
+
   td.cat{color:var(--ivory);}
-  td.score{text-align:center;font-family:'Fraunces',serif;font-weight:600;width:70px;}
-  td.score.mine{cursor:pointer;}
-  td.score.mine:hover{background:rgba(201,162,75,0.18);border-radius:6px;}
-  td.score .empty-preview{color:rgba(244,239,223,0.3);}
+
+  td.score{
+    text-align:center;
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    width:70px;
+  }
+
+  td.score.mine{
+    cursor:pointer;
+  }
+
+  td.score.mine:hover{
+    background:rgba(201,162,75,0.18);
+    border-radius:6px;
+  }
+
+  td.score .empty-preview{
+    color:rgba(244,239,223,0.3);
+  }
+
   .section-label td{
-    padding-top:14px;font-family:'Fraunces',serif;font-weight:700;font-size:14px;
-    color:var(--gold);border-bottom:1px solid rgba(201,162,75,0.3);
+    padding-top:14px;
+    font-family:'Fraunces',serif;
+    font-weight:700;
+    font-size:14px;
+    color:var(--gold);
+    border-bottom:1px solid rgba(201,162,75,0.3);
   }
+
   .log{
-    max-height:110px;overflow-y:auto;font-size:12px;color:var(--ivory-dim);
-    display:flex;flex-direction:column-reverse;gap:3px;
+    max-height:110px;
+    overflow-y:auto;
+    font-size:12px;
+    color:var(--ivory-dim);
+    display:flex;
+    flex-direction:column-reverse;
+    gap:3px;
   }
+
   .winner-banner{
-    text-align:center;font-family:'Fraunces',serif;font-size:24px;font-weight:700;
-    color:var(--gold);margin-bottom:8px;
+    text-align:center;
+    font-family:'Fraunces',serif;
+    font-size:24px;
+    font-weight:700;
+    color:var(--gold);
+    margin-bottom:8px;
   }
-  .room-box{background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;margin-top:10px;text-align:center;font-size:14px;}
-  .code-display{font-family:monospace;font-size:18px;color:var(--banner);font-weight:bold;margin:4px 0;}
+
+  .room-box{
+    background:rgba(0,0,0,0.3);
+    padding:12px;
+    border-radius:8px;
+    margin-top:10px;
+    text-align:center;
+    font-size:14px;
+  }
+
+  .code-display{
+    font-family:monospace;
+    font-size:18px;
+    color:var(--banner);
+    font-weight:bold;
+    margin:4px 0;
+  }
 </style>
 </head>
+
 <body>
+
 <div class="wrap" id="app"></div>
 
 <script>
+
 const CATS = [
-  {id:'ones',   label:'Ones',  sec:'upper'},
-  {id:'twos',   label:'Twos',  sec:'upper'},
-  {id:'threes', label:'Threes',  sec:'upper'},
-  {id:'fours',  label:'Fours',  sec:'upper'},
-  {id:'fives',  label:'Fives',  sec:'upper'},
+  {id:'ones',   label:'Ones', sec:'upper'},
+  {id:'twos',   label:'Twos', sec:'upper'},
+  {id:'threes', label:'Threes', sec:'upper'},
+  {id:'fours',  label:'Fours', sec:'upper'},
+  {id:'fives',  label:'Fives', sec:'upper'},
   {id:'sixes',  label:'Sixes', sec:'upper'},
-  {id:'tris',        label:'Three of a kind',      sec:'lower'},
-  {id:'poker',       label:'Four of a kind',      sec:'lower'},
-  {id:'dueCoppie',   label:'Two Pairs',       sec:'lower'},
-  {id:'treCoppie',   label:'Three Pairs',       sec:'lower'},
-  {id:'dueTris',     label:'Two Threes',      sec:'lower'},
-  {id:'full',        label:'Full House',       sec:'lower'},
-  {id:'grandeFull',  label:'Large Full House',sec:'lower'},
-  {id:'scalaCorta',  label:'Small Straight',    sec:'lower'},
-  {id:'scalaLunga',  label:'Large Straight',     sec:'lower'},
-  {id:'highway',     label:'Highway',          sec:'lower'},
-  {id:'kniffel',        label:'Kniffel',          sec:'lower'},
-  {id:'kniffelExtreme', label:'Kniffel Extreme',  sec:'lower'},
-  {id:'sommaMax10',  label:'10 or less',  sec:'lower'},
-  {id:'sommaMin33',  label:'33 or more',     sec:'lower'},
-  {id:'chance',      label:'Chance',           sec:'lower'},
-  {id:'superChance', label:'Super Chance',     sec:'lower'},
+
+  {id:'tris',          label:'Three of a kind', sec:'lower'},
+  {id:'poker',         label:'Four of a kind', sec:'lower'},
+  {id:'dueCoppie',     label:'Two Pairs', sec:'lower'},
+  {id:'treCoppie',     label:'Three Pairs', sec:'lower'},
+  {id:'dueTris',       label:'Two Threes', sec:'lower'},
+  {id:'full',          label:'Full House', sec:'lower'},
+  {id:'grandeFull',    label:'Large Full House', sec:'lower'},
+  {id:'scalaCorta',    label:'Small Straight', sec:'lower'},
+  {id:'scalaLunga',    label:'Large Straight', sec:'lower'},
+  {id:'highway',       label:'Highway', sec:'lower'},
+  {id:'kniffel',       label:'Kniffel', sec:'lower'},
+  {id:'kniffelExtreme',label:'Kniffel Extreme', sec:'lower'},
+  {id:'sommaMax10',    label:'10 or less', sec:'lower'},
+  {id:'sommaMin33',    label:'33 or more', sec:'lower'},
+  {id:'chance',        label:'Chance', sec:'lower'},
+  {id:'superChance',   label:'Super Chance', sec:'lower'}
 ];
 
+
+// ============================================================
+// SCORE CALCULATIONS
+// ============================================================
+
 function counts(dice){
-  const c={};
-  dice.slice(0,5).forEach(v=>c[v]=(c[v]||0)+1);
-  const r=dice[5];
-  if(r>=1&&r<=6) c[r]=(c[r]||0)+1;
+
+  const c = {};
+
+  // Five normal dice: 1-6
+  dice.slice(0,5).forEach(v=>{
+    if(v !== null && v !== undefined){
+      c[v] = (c[v] || 0) + 1;
+    }
+  });
+
+  // Red die: 0-9
+  const r = dice[5];
+
+  if(r !== null && r !== undefined && r >= 0 && r <= 9){
+    c[r] = (c[r] || 0) + 1;
+  }
+
   return c;
 }
-function sumAll(dice){return dice.reduce((a,b)=>a+b,0);}
+
+
+function sumAll(dice){
+  return dice.reduce((a,b)=>a+(b ?? 0),0);
+}
+
+
 function consecutiveRun(keysSorted, len){
+
   for(let i=0;i<=keysSorted.length-len;i++){
+
     let ok=true;
-    for(let j=1;j<len;j++) if(keysSorted[i+j]!==keysSorted[i]+j){ok=false;break;}
+
+    for(let j=1;j<len;j++){
+
+      if(keysSorted[i+j] !== keysSorted[i]+j){
+        ok=false;
+        break;
+      }
+
+    }
+
     if(ok) return true;
   }
+
   return false;
 }
-function evalCategory(id, dice){
+
+
+function evalCategory(id,dice){
+
   const c = counts(dice);
   const vals = Object.values(c);
   const keys = Object.keys(c).map(Number).sort((a,b)=>a-b);
-  const max = vals.length?Math.max(...vals):0;
+
+  const max = vals.length ? Math.max(...vals) : 0;
   const sum = sumAll(dice);
+
   switch(id){
-    case 'ones': return {valid:true, score:(c[1]||0)*1};
-    case 'twos': return {valid:true, score:(c[2]||0)*2};
-    case 'threes': return {valid:true, score:(c[3]||0)*3};
-    case 'fours': return {valid:true, score:(c[4]||0)*4};
-    case 'fives': return {valid:true, score:(c[5]||0)*5};
-    case 'sixes': return {valid:true, score:(c[6]||0)*6};
-    case 'tris': { const v=max>=3; return {valid:v, score:v?sum:0}; }
-    case 'poker': { const v=max>=4; return {valid:v, score:v?sum:0}; }
-    case 'dueCoppie': { const pairVals = keys.filter(k=>c[k]>=2); const v = pairVals.length>=2; return {valid:v, score:v?sum:0}; }
-    case 'treCoppie': { const pairVals = keys.filter(k=>c[k]>=2); const v=pairVals.length>=3; return {valid:v, score:v?35:0}; }
-    case 'dueTris': { const trisVals = keys.filter(k=>c[k]>=3); const v=trisVals.length>=2; return {valid:v, score:v?45:0}; }
-    case 'full': { const sorted=vals.slice().sort((a,b)=>a-b); return {valid:sorted.length===2 && sorted[0]===2 && sorted[1]===3, score:25}; }
-    case 'grandeFull': { const hasFour=keys.some(k=>c[k]>=4); const v=hasFour && keys.filter(k=>c[k]>=2).length>=2; return {valid:v, score:v?45:0}; }
-    case 'scalaCorta': { const v=consecutiveRun(keys,4); return {valid:v, score:v?30:0}; }
-    case 'scalaLunga': { const v=consecutiveRun(keys,5); return {valid:v, score:v?40:0}; }
-    case 'highway': { const v=keys.length===6 && keys.every(k=>c[k]===1) && keys[0]===1 && keys[5]===6; return {valid:v, score:v?50:0}; }
-    case 'kniffel': { const v=max>=5; return {valid:v, score:v?50:0}; }
-    case 'kniffelExtreme': { const v=max===6; return {valid:v, score:v?75:0}; }
-    case 'sommaMax10': { const v=sum<=10; return {valid:v, score:v?40:0}; }
-    case 'sommaMin33': { const v=sum>=33; return {valid:v, score:v?40:0}; }
-    case 'chance': return {valid:true, score:sum};
-    case 'superChance': return {valid:true, score:sum*2};
+
+    case 'ones':
+      return {valid:true,score:(c[1]||0)*1};
+
+    case 'twos':
+      return {valid:true,score:(c[2]||0)*2};
+
+    case 'threes':
+      return {valid:true,score:(c[3]||0)*3};
+
+    case 'fours':
+      return {valid:true,score:(c[4]||0)*4};
+
+    case 'fives':
+      return {valid:true,score:(c[5]||0)*5};
+
+    case 'sixes':
+      return {valid:true,score:(c[6]||0)*6};
+
+    case 'tris':{
+      const v=max>=3;
+      return {valid:v,score:v?sum:0};
+    }
+
+    case 'poker':{
+      const v=max>=4;
+      return {valid:v,score:v?sum:0};
+    }
+
+    case 'dueCoppie':{
+      const pairVals=keys.filter(k=>c[k]>=2);
+      const v=pairVals.length>=2;
+      return {valid:v,score:v?sum:0};
+    }
+
+    case 'treCoppie':{
+      const pairVals=keys.filter(k=>c[k]>=2);
+      const v=pairVals.length>=3;
+      return {valid:v,score:v?35:0};
+    }
+
+    case 'dueTris':{
+      const trisVals=keys.filter(k=>c[k]>=3);
+      const v=trisVals.length>=2;
+      return {valid:v,score:v?45:0};
+    }
+
+    case 'full':{
+      const sorted=vals.slice().sort((a,b)=>a-b);
+      const v=
+        sorted.length===2 &&
+        sorted[0]===2 &&
+        sorted[1]===3;
+
+      return {valid:v,score:25};
+    }
+
+    case 'grandeFull':{
+      const hasFour=keys.some(k=>c[k]>=4);
+      const v=
+        hasFour &&
+        keys.filter(k=>c[k]>=2).length>=2;
+
+      return {valid:v,score:v?45:0};
+    }
+
+    case 'scalaCorta':{
+      const v=consecutiveRun(keys,4);
+      return {valid:v,score:v?30:0};
+    }
+
+    case 'scalaLunga':{
+      const v=consecutiveRun(keys,5);
+      return {valid:v,score:v?40:0};
+    }
+
+    case 'highway':{
+      const v=
+        keys.length===6 &&
+        keys.every(k=>c[k]===1) &&
+        keys[0]===1 &&
+        keys[5]===6;
+
+      return {valid:v,score:v?50:0};
+    }
+
+    case 'kniffel':{
+      const v=max>=5;
+      return {valid:v,score:v?50:0};
+    }
+
+    case 'kniffelExtreme':{
+      const v=max===6;
+      return {valid:v,score:v?75:0};
+    }
+
+    case 'sommaMax10':{
+      const v=sum<=10;
+      return {valid:v,score:v?40:0};
+    }
+
+    case 'sommaMin33':{
+      const v=sum>=33;
+      return {valid:v,score:v?40:0};
+    }
+
+    case 'chance':
+      return {valid:true,score:sum};
+
+    case 'superChance':
+      return {valid:true,score:sum*2};
   }
-  return {valid:false, score:0};
+
+  return {valid:false,score:0};
 }
 
-// ---- P2P State & Game Logic ----
-let peer = null;
-let conn = null;
-let isHost = false;
-let myId = 'p_' + Math.random().toString(36).slice(2,9);
-let myName = '';
-let targetRoomId = '';
-let phase = 'setup'; // setup | waiting | play
-let joinError = '';
 
-let game = {
-  players: [],
-  turnIndex: 0,
-  dice: [null,null,null,null,null,null],
-  held: [false,false,false,false,false,false],
-  rollsLeft: 3,
-  usedExtraThisTurn: false,
-  chipsLeft: {},
-  scores: {},
-  log: [],
-  gameOver: false,
-  rolledThisTurn: false
+// ============================================================
+// P2P STATE
+// ============================================================
+
+let peer=null;
+let conn=null;
+
+let isHost=false;
+
+let myId='p_'+Math.random().toString(36).slice(2,9);
+
+let myName='';
+let targetRoomId='';
+
+let phase='setup';
+let joinError='';
+
+
+// ============================================================
+// GAME STATE
+// ============================================================
+
+let game={
+  players:[],
+  turnIndex:0,
+
+  dice:[null,null,null,null,null,null],
+
+  held:[false,false,false,false,false,false],
+
+  rollsLeft:3,
+
+  usedExtraThisTurn:false,
+
+  chipsLeft:{},
+
+  scores:{},
+
+  log:[],
+
+  gameOver:false,
+
+  rolledThisTurn:false
 };
 
-function emptyScores(){ const o={}; CATS.forEach(c=>o[c.id]=null); return o; }
 
-function initPeer(customId = undefined){
-  peer = new Peer(customId, {
-    config: {
-      iceServers: [
-      {
-        urls: "stun:stun.relay.metered.ca:80",
-      },
-      {
-        urls: "turn:global.relay.metered.ca:80",
-        username: "2ac9c3102db1f9b1ad207da5",
-        credential: "5rr6cgpxngte+TkE",
-      },
-      {
-        urls: "turn:global.relay.metered.ca:80?transport=tcp",
-        username: "2ac9c3102db1f9b1ad207da5",
-        credential: "5rr6cgpxngte+TkE",
-      },
-      {
-        urls: "turn:global.relay.metered.ca:443",
-        username: "2ac9c3102db1f9b1ad207da5",
-        credential: "5rr6cgpxngte+TkE",
-      },
-      {
-        urls: "turns:global.relay.metered.ca:443?transport=tcp",
-        username: "2ac9c3102db1f9b1ad207da5",
-        credential: "5rr6cgpxngte+TkE",
-      },
-  ],
-    }
+function emptyScores(){
+
+  const o={};
+
+  CATS.forEach(c=>{
+    o[c.id]=null;
   });
 
-  peer.on('open', (id) => {
-    myId = id;
-    if(isHost) {
-      document.getElementById('roomCodeDisplay').innerText = id;
-    }
-  });
-
-  peer.on('connection', (c) => {
-    conn = c;
-    setupConnection();
-    isHost = true;
-  });
+  return o;
 }
+
+
+// ============================================================
+// PEERJS
+// ============================================================
+
+function initPeer(customId=undefined){
+
+  peer=new Peer(customId,{
+    config:{
+      iceServers:[
+
+        {
+          urls:"stun:stun.relay.metered.ca:80"
+        },
+
+        {
+          urls:"turn:global.relay.metered.ca:80",
+          username:"2ac9c3102db1f9b1ad207da5",
+          credential:"5rr6cgpxngte+TkE",
+        },
+
+        {
+          urls:"turn:global.relay.metered.ca:80?transport=tcp",
+          username:"2ac9c3102db1f9b1ad207da5",
+          credential:"5rr6cgpxngte+TkE"
+        },
+
+        {
+          urls:"turn:global.relay.metered.ca:443",
+          username:"2ac9c3102db1f9b1ad207da5",
+          credential:"5rr6cgpxngte+TkE"
+        },
+
+        {
+          urls:"turns:global.relay.metered.ca:443?transport=tcp",
+          username:"2ac9c3102db1f9b1ad207da5",
+          credential:"5rr6cgpxngte+TkE"
+        }
+
+      ]
+    }
+  });
+
+
+  // PeerJS has successfully created the peer
+  peer.on('open',(id)=>{
+
+    myId=id;
+
+    // HOST
+    if(isHost){
+
+      // IMPORTANT:
+      // The host player is created only AFTER
+      // PeerJS gives us the real ID.
+      game.players=[
+        {
+          id:myId,
+          name:myName
+        }
+      ];
+
+      game.chipsLeft[myId]=3;
+      game.scores[myId]=emptyScores();
+
+      const code=document.getElementById('roomCodeDisplay');
+
+      if(code){
+        code.innerText=id;
+      }
+
+    }
+
+    // GUEST
+    else{
+
+      conn=peer.connect(targetRoomId);
+
+      setupConnection();
+
+      conn.on('open',()=>{
+
+        conn.send({
+          type:'JOIN',
+          name:myName,
+          id:myId
+        });
+
+      });
+
+    }
+
+  });
+
+
+  // Incoming connection = guest connecting to host
+  peer.on('connection',(c)=>{
+
+    conn=c;
+
+    setupConnection();
+
+  });
+
+
+  peer.on('error',(err)=>{
+
+    console.error('PeerJS error:',err);
+
+    joinError='Connection error: '+(err.type || 'unknown error');
+
+    if(phase==='waiting'){
+      render();
+    }
+
+  });
+
+}
+
+
+// ============================================================
+// CREATE ROOM
+// ============================================================
 
 function hostGame(){
-  myName = document.getElementById('nameInput').value.trim();
-  if(!myName){ joinError='Please enter your name.'; render(); return; }
-  isHost = true;
-  phase = 'waiting';
+
+  myName=document.getElementById('nameInput').value.trim();
+
+  if(!myName){
+
+    joinError='Please enter your name.';
+    render();
+    return;
+
+  }
+
+  isHost=true;
+  phase='waiting';
+
   render();
+
   initPeer();
-  
-  setTimeout(()=>{
-    game.players = [{id: myId, name: myName}];
-    game.chipsLeft[myId] = 3;
-    game.scores[myId] = emptyScores();
-  }, 500);
+
 }
+
+
+// ============================================================
+// JOIN ROOM
+// ============================================================
 
 function joinGameModal(){
-  myName = document.getElementById('nameInput').value.trim();
-  targetRoomId = document.getElementById('roomInput').value.trim();
-  if(!myName || !targetRoomId){ joinError='Please enter name and room code.'; render(); return; }
-  
-  phase = 'waiting';
+
+  myName=document.getElementById('nameInput').value.trim();
+
+  targetRoomId=document.getElementById('roomInput').value.trim();
+
+  if(!myName || !targetRoomId){
+
+    joinError='Please enter name and room code.';
+    render();
+    return;
+
+  }
+
+  isHost=false;
+  phase='waiting';
+
   render();
+
   initPeer();
 
-  setTimeout(()=>{
-    conn = peer.connect(targetRoomId);
-    setupConnection();
-    conn.on('open', ()=>{
-      conn.send({type: 'JOIN', name: myName, id: myId});
-    });
-  }, 1000);
 }
+
+
+// ============================================================
+// CONNECTION DATA
+// ============================================================
 
 function setupConnection(){
-  conn.on('data', (data) => {
+
+  if(!conn) return;
+
+  conn.on('data',(data)=>{
+
+    // ========================================================
+    // HOST RECEIVES JOIN
+    // ========================================================
+
     if(isHost){
-      if(data.type === 'JOIN'){
-        // Check to prevent duplicating players
-        const alreadyExists = game.players.some(p => p.id === data.id || p.name.toLowerCase() === data.name.toLowerCase());
-        
-        if(!alreadyExists && game.players.length < 2){
-          const guest = {id: data.id, name: data.name};
+
+      if(data.type==='JOIN'){
+
+        const alreadyExists=
+          game.players.some(p=>
+            p.id===data.id ||
+            p.name.toLowerCase()===data.name.toLowerCase()
+          );
+
+
+        if(!alreadyExists && game.players.length<2){
+
+          const guest={
+            id:data.id,
+            name:data.name
+          };
+
           game.players.push(guest);
-          game.chipsLeft[guest.id] = 3;
-          game.scores[guest.id] = emptyScores();
-          log(game, guest.name + ' joined the game.');
-          phase = 'play';
+
+          game.chipsLeft[guest.id]=3;
+
+          game.scores[guest.id]=emptyScores();
+
+          log(game,guest.name+' joined the game.');
+
+          phase='play';
+
           syncState();
-        } else if(alreadyExists) {
-          phase = 'play';
-          syncState();
+
         }
-      } else if(data.type === 'ACTION') {
-        game = data.game;
+
+        else if(alreadyExists){
+
+          phase='play';
+
+          syncState();
+
+        }
+
+      }
+
+
+      // ======================================================
+      // HOST RECEIVES GAME ACTION
+      // ======================================================
+
+      else if(data.type==='ACTION'){
+
+        game=data.game;
+
         syncState();
+
       }
-    } else {
-      if(data.type === 'STATE'){
-        game = data.game;
-        phase = 'play';
-        render();
-      }
+
     }
+
+
+    // ========================================================
+    // GUEST RECEIVES STATE
+    // ========================================================
+
+    else{
+
+      if(data.type==='STATE'){
+
+        game=data.game;
+
+        phase='play';
+
+        render();
+
+      }
+
+    }
+
   });
+
 }
+
+
+// ============================================================
+// SYNCHRONIZE GAME
+// ============================================================
 
 function syncState(){
+
   if(isHost && conn){
-    conn.send({type: 'STATE', game: game});
+
+    if(conn.open){
+
+      conn.send({
+        type:'STATE',
+        game:game
+      });
+
+    }
+
   }
+
   render();
+
 }
 
-function log(g, text){
+
+// ============================================================
+// LOG
+// ============================================================
+
+function log(g,text){
+
   g.log.push(text);
-  if(g.log.length>40) g.log.shift();
+
+  if(g.log.length>40){
+    g.log.shift();
+  }
+
 }
+
+
+// ============================================================
+// PLAYER HELPERS
+// ============================================================
 
 function myTurn(){
-  if(!game || game.players.length<2) return false;
-  return game.players[game.turnIndex].id === myId;
+
+  if(!game || game.players.length<2){
+    return false;
+  }
+
+  return game.players[game.turnIndex].id===myId;
 }
+
+
 function opponent(){
-  if(!game) return null;
-  return game.players.find(p=>p.id!==myId) || null;
+
+  if(!game){
+    return null;
+  }
+
+  return game.players.find(p=>p.id!==myId)||null;
 }
+
+
+// ============================================================
+// ROLL DICE
+// ============================================================
 
 function rollDice(){
-  if(!myTurn() || game.rollsLeft<=0 || game.gameOver) return;
-  const d = game.dice.slice();
-  for(let i=0;i<5;i++) if(!game.held[i]) d[i] = 1+Math.floor(Math.random()*6);
-  if(!game.held[5]) d[5] = Math.floor(Math.random()*10);
-  game.dice = d;
-  game.rollsLeft -= 1;
-  game.rolledThisTurn = true;
-  log(game, game.players[game.turnIndex].name + ' rolled the dice.');
+
+  if(
+    !myTurn() ||
+    game.rollsLeft<=0 ||
+    game.gameOver
+  ){
+    return;
+  }
+
+  const d=game.dice.slice();
+
+
+  // Five normal dice: 1-6
+  for(let i=0;i<5;i++){
+
+    if(!game.held[i]){
+
+      d[i]=1+Math.floor(Math.random()*6);
+
+    }
+
+  }
+
+
+  // Red die: 0-9
+  if(!game.held[5]){
+
+    d[5]=Math.floor(Math.random()*10);
+
+  }
+
+
+  game.dice=d;
+
+  game.rollsLeft-=1;
+
+  game.rolledThisTurn=true;
+
+  log(
+    game,
+    game.players[game.turnIndex].name+
+    ' rolled the dice.'
+  );
+
   endAction();
+
 }
+
+
+// ============================================================
+// HOLD DICE
+// ============================================================
 
 function toggleHold(i){
-  if(!myTurn() || !game.rolledThisTurn || game.gameOver) return;
-  game.held[i] = !game.held[i];
+
+  if(
+    !myTurn() ||
+    !game.rolledThisTurn ||
+    game.gameOver
+  ){
+    return;
+  }
+
+  game.held[i]=!game.held[i];
+
   endAction();
+
 }
+
+
+// ============================================================
+// EXTRA ROLL CHIP
+// ============================================================
 
 function useChip(){
-  if(!myTurn() || game.rollsLeft>0 || game.usedExtraThisTurn || game.gameOver) return;
-  if((game.chipsLeft[myId]||0)<=0) return;
-  game.chipsLeft[myId] -= 1;
-  game.rollsLeft = 1;
-  game.usedExtraThisTurn = true;
-  log(game, game.players[game.turnIndex].name + ' used an extra roll chip.');
+
+  if(
+    !myTurn() ||
+    game.rollsLeft>0 ||
+    game.usedExtraThisTurn ||
+    game.gameOver
+  ){
+    return;
+  }
+
+  if((game.chipsLeft[myId]||0)<=0){
+    return;
+  }
+
+  game.chipsLeft[myId]-=1;
+
+  game.rollsLeft=1;
+
+  game.usedExtraThisTurn=true;
+
+  log(
+    game,
+    game.players[game.turnIndex].name+
+    ' used an extra roll chip.'
+  );
+
   endAction();
+
 }
+
+
+// ============================================================
+// CHOOSE SCORE
+// ============================================================
 
 function chooseScore(catId){
-  if(!myTurn() || !game.rolledThisTurn || game.gameOver) return;
-  if(game.scores[myId][catId] !== null) return;
-  const {score} = evalCategory(catId, game.dice);
-  game.scores[myId][catId] = score;
-  log(game, game.players[game.turnIndex].name + ' scored "' + CATS.find(c=>c.id===catId).label + '": ' + score + ' points.');
-  
-  const bothDone = game.players.every(p => CATS.every(c => game.scores[p.id][c.id] !== null));
-  if(bothDone){
-    game.gameOver = true;
-  } else {
-    game.turnIndex = (game.turnIndex+1) % game.players.length;
-    game.dice = [null,null,null,null,null,null];
-    game.held = [false,false,false,false,false,false];
-    game.rollsLeft = 3;
-    game.usedExtraThisTurn = false;
-    game.rolledThisTurn = false;
+
+  if(
+    !myTurn() ||
+    !game.rolledThisTurn ||
+    game.gameOver
+  ){
+    return;
   }
+
+  if(game.scores[myId][catId]!==null){
+    return;
+  }
+
+  const {score}=evalCategory(catId,game.dice);
+
+  game.scores[myId][catId]=score;
+
+  log(
+    game,
+    game.players[game.turnIndex].name+
+    ' scored "'+
+    CATS.find(c=>c.id===catId).label+
+    '": '+
+    score+
+    ' points.'
+  );
+
+
+  const bothDone=
+    game.players.every(p=>
+      CATS.every(c=>
+        game.scores[p.id][c.id]!==null
+      )
+    );
+
+
+  if(bothDone){
+
+    game.gameOver=true;
+
+  }
+
+  else{
+
+    game.turnIndex=
+      (game.turnIndex+1)%game.players.length;
+
+    game.dice=[
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ];
+
+    game.held=[
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ];
+
+    game.rollsLeft=3;
+
+    game.usedExtraThisTurn=false;
+
+    game.rolledThisTurn=false;
+
+  }
+
   endAction();
+
 }
+
+
+// ============================================================
+// END ACTION
+// ============================================================
 
 function endAction(){
+
   if(isHost){
+
     syncState();
-  } else {
-    conn.send({type: 'ACTION', game: game});
-    render();
+
   }
+
+  else{
+
+    if(conn && conn.open){
+
+      conn.send({
+        type:'ACTION',
+        game:game
+      });
+
+    }
+
+    render();
+
+  }
+
 }
+
+
+// ============================================================
+// RESET GAME
+// ============================================================
 
 function resetGame(){
-  if(!confirm('Start a new game?')) return;
-  const players = game.players;
-  game = {
-    players: players,
-    turnIndex: 0,
-    dice: [null,null,null,null,null,null],
-    held: [false,false,false,false,false,false],
-    rollsLeft: 3,
-    usedExtraThisTurn: false,
-    chipsLeft: {},
-    scores: {},
-    log: [],
-    gameOver: false,
-    rolledThisTurn: false
+
+  if(!confirm('Start a new game?')){
+    return;
+  }
+
+  const players=game.players;
+
+  game={
+
+    players:players,
+
+    turnIndex:0,
+
+    dice:[
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+
+    held:[
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+
+    rollsLeft:3,
+
+    usedExtraThisTurn:false,
+
+    chipsLeft:{},
+
+    scores:{},
+
+    log:[],
+
+    gameOver:false,
+
+    rolledThisTurn:false
+
   };
-  players.forEach(p=>{ game.chipsLeft[p.id]=3; game.scores[p.id]=emptyScores(); });
-  log(game, 'New game started.');
+
+
+  players.forEach(p=>{
+
+    game.chipsLeft[p.id]=3;
+
+    game.scores[p.id]=emptyScores();
+
+  });
+
+
+  log(game,'New game started.');
+
   endAction();
+
 }
 
-function upperSum(pid){ return CATS.filter(c=>c.sec==='upper').reduce((s,c)=> s + (game.scores[pid][c.id]||0), 0); }
-function upperAllFilled(pid){ return CATS.filter(c=>c.sec==='upper').every(c=> game.scores[pid][c.id] !== null); }
-function bonus(pid){ if(!upperAllFilled(pid)) return null; return upperSum(pid) >= 73 ? 45 : 0; }
-function lowerSum(pid){ return CATS.filter(c=>c.sec==='lower').reduce((s,c)=> s + (game.scores[pid][c.id]||0), 0); }
-function totalScore(pid){ return upperSum(pid) + (bonus(pid)||0) + lowerSum(pid); }
 
-const ROTATIONS = [-9, 7, -4, 11, -13, 5];
+// ============================================================
+// SCORE TOTALS
+// ============================================================
+
+function upperSum(pid){
+
+  return CATS
+    .filter(c=>c.sec==='upper')
+    .reduce(
+      (s,c)=>s+(game.scores[pid][c.id]||0),
+      0
+    );
+
+}
+
+
+function upperAllFilled(pid){
+
+  return CATS
+    .filter(c=>c.sec==='upper')
+    .every(c=>
+      game.scores[pid][c.id]!==null
+    );
+
+}
+
+
+function bonus(pid){
+
+  if(!upperAllFilled(pid)){
+    return null;
+  }
+
+  return upperSum(pid)>=73 ? 45 : 0;
+
+}
+
+
+function lowerSum(pid){
+
+  return CATS
+    .filter(c=>c.sec==='lower')
+    .reduce(
+      (s,c)=>s+(game.scores[pid][c.id]||0),
+      0
+    );
+
+}
+
+
+function totalScore(pid){
+
+  return upperSum(pid)
+    +(bonus(pid)||0)
+    +lowerSum(pid);
+
+}
+
+
+// ============================================================
+// DICE DISPLAY
+// ============================================================
+
+const ROTATIONS=[
+  -9,
+  7,
+  -4,
+  11,
+  -13,
+  5
+];
+
+
 function diceHtml(){
+
   return game.dice.map((v,i)=>{
-    const isRed = i===5, empty = v===null, held = game.held[i];
-    const cls = ['die', isRed?'red':'', held?'held':'', empty?'empty':''].join(' ');
-    return `<div class="${cls}" style="transform:rotate(${empty?0:ROTATIONS[i]}deg)${held?' translateY(6px)':''}" ${empty?'':`onclick="toggleHold(${i})"`}>${empty?'':v}</div>`;
+
+    const isRed=i===5;
+
+    const empty=v===null;
+
+    const held=game.held[i];
+
+    const cls=[
+      'die',
+      isRed?'red':'',
+      held?'held':'',
+      empty?'empty':''
+    ].join(' ');
+
+
+    return `
+      <div
+        class="${cls}"
+        style="
+          transform:
+            rotate(${empty?0:ROTATIONS[i]}deg)
+            ${held?' translateY(6px)':''}
+        "
+        ${empty?'':`onclick="toggleHold(${i})"`}
+      >
+        ${empty?'':v}
+      </div>
+    `;
+
   }).join('');
+
 }
 
-function scoreCell(pid, cat){
-  const val = game.scores[pid][cat.id];
-  const canPick = pid===myId && myTurn() && game.rolledThisTurn && !game.gameOver && val===null;
-  if(val!==null) return `<td class="score">${val}</td>`;
-  if(canPick) return `<td class="score mine" onclick="chooseScore('${cat.id}')"><span class="empty-preview">–</span></td>`;
-  return `<td class="score"><span class="empty-preview">–</span></td>`;
+
+// ============================================================
+// SCORE CELL
+// ============================================================
+
+function scoreCell(pid,cat){
+
+  const val=game.scores[pid][cat.id];
+
+  const canPick=
+    pid===myId &&
+    myTurn() &&
+    game.rolledThisTurn &&
+    !game.gameOver &&
+    val===null;
+
+
+  if(val!==null){
+
+    return `
+      <td class="score">
+        ${val}
+      </td>
+    `;
+
+  }
+
+
+  if(canPick){
+
+    return `
+      <td
+        class="score mine"
+        onclick="chooseScore('${cat.id}')"
+      >
+        <span class="empty-preview">–</span>
+      </td>
+    `;
+
+  }
+
+
+  return `
+    <td class="score">
+      <span class="empty-preview">–</span>
+    </td>
+  `;
+
 }
+
+
+// ============================================================
+// RENDER
+// ============================================================
 
 function render(){
-  const app = document.getElementById('app');
+
+  const app=document.getElementById('app');
+
+
+  // ==========================================================
+  // SETUP
+  // ==========================================================
+
   if(phase==='setup'){
-    app.innerHTML = `
+
+    app.innerHTML=`
+
       <h1>Kniffel Extreme</h1>
-      <p class="sub">Direct P2P Connection Between Devices</p>
-      <div class="card" style="max-width:420px;margin:0 auto">
+
+      <p class="sub">
+        Direct P2P Connection Between Devices
+      </p>
+
+      <div
+        class="card"
+        style="max-width:420px;margin:0 auto"
+      >
+
         <div class="field">
+
           <label>Your Name</label>
-          <input type="text" id="nameInput" placeholder="Ex. Martina">
+
+          <input
+            type="text"
+            id="nameInput"
+            placeholder="Ex. Martina"
+          >
+
         </div>
-        ${joinError?`<div class="err">${joinError}</div>`:''}
-        <div style="display:flex;gap:10px;margin-top:10px;">
-          <button class="btn-primary" onclick="hostGame()">Create Room</button>
+
+
+        ${joinError?`
+          <div class="err">
+            ${joinError}
+          </div>
+        `:''}
+
+
+        <div
+          style="
+            display:flex;
+            gap:10px;
+            margin-top:10px;
+          "
+        >
+
+          <button
+            class="btn-primary"
+            onclick="hostGame()"
+          >
+            Create Room
+          </button>
+
         </div>
-        <hr style="border:0;border-top:1px solid rgba(244,239,223,0.15);margin:20px 0;">
+
+
+        <hr
+          style="
+            border:0;
+            border-top:
+              1px solid
+              rgba(244,239,223,0.15);
+            margin:20px 0;
+          "
+        >
+
+
         <div class="field">
+
           <label>Friend's Room Code</label>
-          <input type="text" id="roomInput" placeholder="Paste code here">
+
+          <input
+            type="text"
+            id="roomInput"
+            placeholder="Paste code here"
+          >
+
         </div>
-        <button class="btn-ghost" style="width:100%" onclick="joinGameModal()">Join Room</button>
+
+
+        <button
+          class="btn-ghost"
+          style="width:100%"
+          onclick="joinGameModal()"
+        >
+          Join Room
+        </button>
+
       </div>
+
     `;
+
     return;
+
   }
+
+
+  // ==========================================================
+  // WAITING
+  // ==========================================================
 
   if(phase==='waiting'){
-    app.innerHTML = `
+
+    app.innerHTML=`
+
       <h1>Kniffel Extreme</h1>
-      <div class="card" style="text-align:center;max-width:420px;margin:0 auto">
-        <p style="font-family:'Fraunces',serif;font-size:18px;margin:0 0 6px">Waiting for the other player...</p>
-        ${isHost ? `<div class="room-box">Share this code with your friend:<div class="code-display" id="roomCodeDisplay">Generating...</div></div>` : '<p class="sub">Connecting...</p>'}
+
+      <div
+        class="card"
+        style="
+          text-align:center;
+          max-width:420px;
+          margin:0 auto
+        "
+      >
+
+        <p
+          style="
+            font-family:'Fraunces',serif;
+            font-size:18px;
+            margin:0 0 6px
+          "
+        >
+          Waiting for the other player...
+        </p>
+
+
+        ${
+          isHost
+          ?
+          `
+            <div class="room-box">
+
+              Share this code with your friend:
+
+              <div
+                class="code-display"
+                id="roomCodeDisplay"
+              >
+                Generating...
+              </div>
+
+            </div>
+          `
+          :
+          `
+            <p class="sub">
+              Connecting...
+            </p>
+          `
+        }
+
       </div>
+
     `;
+
+    return;
+
+  }
+
+
+  // ==========================================================
+  // GAME
+  // ==========================================================
+
+  const me=
+    game.players.find(p=>p.id===myId)
+    ||
+    game.players[0];
+
+
+  const opp=
+    opponent()
+    ||
+    game.players[1];
+
+
+  if(!me || !opp){
     return;
   }
 
-  const me = game.players.find(p=>p.id===myId) || game.players[0];
-  const opp = opponent() || game.players[1];
-  const canRoll = myTurn() && game.rollsLeft>0 && !game.gameOver;
-  const canExtra = myTurn() && game.rollsLeft===0 && !game.usedExtraThisTurn && (game.chipsLeft[myId]||0)>0 && !game.gameOver;
 
-  const upperRows = CATS.filter(c=>c.sec==='upper').map(c=>`<tr><td class="cat">${c.label}</td>${scoreCell(me.id,c)}${scoreCell(opp.id,c)}</tr>`).join('');
-  const lowerRows = CATS.filter(c=>c.sec==='lower').map(c=>`<tr><td class="cat">${c.label}</td>${scoreCell(me.id,c)}${scoreCell(opp.id,c)}</tr>`).join('');
-  
-  const chipsHtml = (pid)=>{
-    const used = 3-(game.chipsLeft[pid]||0);
-    let s=''; for(let i=0;i<3;i++) s += `<span class="chip ${i<used?'spent':''}"></span>`;
+  const canRoll=
+    myTurn() &&
+    game.rollsLeft>0 &&
+    !game.gameOver;
+
+
+  const canExtra=
+    myTurn() &&
+    game.rollsLeft===0 &&
+    !game.usedExtraThisTurn &&
+    (game.chipsLeft[myId]||0)>0 &&
+    !game.gameOver;
+
+
+  const upperRows=
+    CATS
+      .filter(c=>c.sec==='upper')
+      .map(c=>`
+        <tr>
+          <td class="cat">
+            ${c.label}
+          </td>
+          ${scoreCell(me.id,c)}
+          ${scoreCell(opp.id,c)}
+        </tr>
+      `)
+      .join('');
+
+
+  const lowerRows=
+    CATS
+      .filter(c=>c.sec==='lower')
+      .map(c=>`
+        <tr>
+          <td class="cat">
+            ${c.label}
+          </td>
+          ${scoreCell(me.id,c)}
+          ${scoreCell(opp.id,c)}
+        </tr>
+      `)
+      .join('');
+
+
+  const chipsHtml=(pid)=>{
+
+    const used=
+      3-(game.chipsLeft[pid]||0);
+
+    let s='';
+
+    for(let i=0;i<3;i++){
+
+      s+=`
+        <span
+          class="chip ${i<used?'spent':''}"
+        ></span>
+      `;
+
+    }
+
     return s;
+
   };
 
-  const leftPanel = game.gameOver ? `
+
+  // ==========================================================
+  // LEFT PANEL
+  // ==========================================================
+
+  const leftPanel=
+
+    game.gameOver
+
+    ?
+
+    `
       <div class="card">
-        <div class="winner-banner">${totalScore(me.id)===totalScore(opp.id) ? 'Draw!' : (totalScore(me.id)>totalScore(opp.id) ? 'You won!' : opp.name+' won!')}</div>
-        <div class="meta"><span><b>${me.name}</b>: ${totalScore(me.id)} points</span></div>
-        <div class="meta"><span><b>${opp.name}</b>: ${totalScore(opp.id)} points</span></div>
-        <div style="text-align:center;margin-top:10px"><button class="btn-primary" onclick="resetGame()">New Game</button></div>
+
+        <div class="winner-banner">
+
+          ${
+            totalScore(me.id)===totalScore(opp.id)
+            ?
+            'Draw!'
+            :
+            (
+              totalScore(me.id)>totalScore(opp.id)
+              ?
+              'You won!'
+              :
+              opp.name+' won!'
+            )
+          }
+
+        </div>
+
+
+        <div class="meta">
+
+          <span>
+            <b>${me.name}</b>:
+            ${totalScore(me.id)}
+            points
+          </span>
+
+        </div>
+
+
+        <div class="meta">
+
+          <span>
+            <b>${opp.name}</b>:
+            ${totalScore(opp.id)}
+            points
+          </span>
+
+        </div>
+
+
+        <div
+          style="
+            text-align:center;
+            margin-top:10px
+          "
+        >
+
+          <button
+            class="btn-primary"
+            onclick="resetGame()"
+          >
+            New Game
+          </button>
+
+        </div>
+
       </div>
-  ` : `
+    `
+
+    :
+
+    `
       <div class="players-row">
-        <div class="avatar-wrap"><div class="avatar gold ${myTurn()?'turn':''}">${me.name.charAt(0).toUpperCase()}</div><div class="avatar-name ${myTurn()?'turn':''}">${me.name}</div></div>
-        <div class="avatar-wrap"><div class="avatar red ${!myTurn()?'turn':''}">${opp.name.charAt(0).toUpperCase()}</div><div class="avatar-name ${!myTurn()?'turn':''}">${opp.name}</div></div>
+
+        <div class="avatar-wrap">
+
+          <div
+            class="
+              avatar
+              gold
+              ${myTurn()?'turn':''}
+            "
+          >
+            ${me.name.charAt(0).toUpperCase()}
+          </div>
+
+          <div
+            class="
+              avatar-name
+              ${myTurn()?'turn':''}
+            "
+          >
+            ${me.name}
+          </div>
+
+        </div>
+
+
+        <div class="avatar-wrap">
+
+          <div
+            class="
+              avatar
+              red
+              ${!myTurn()?'turn':''}
+            "
+          >
+            ${opp.name.charAt(0).toUpperCase()}
+          </div>
+
+          <div
+            class="
+              avatar-name
+              ${!myTurn()?'turn':''}
+            "
+          >
+            ${opp.name}
+          </div>
+
+        </div>
+
       </div>
-      <div class="banner">${!myTurn() ? 'Turn of '+opp.name+'.' : (game.rollsLeft===3 && !game.rolledThisTurn ? 'Your turn: roll the dice.' : game.rollsLeft>0 ? 'Keep desired dice. Rolls left: '+game.rollsLeft : 'Choose a combination on the board.')}</div>
-      <div class="dice-tray">${diceHtml()}</div>
-      <div class="controls"><button class="btn-primary" onclick="rollDice()" ${canRoll?'':'disabled'}>Roll Dice (${game.rollsLeft})</button></div>
+
+
+      <div class="banner">
+
+        ${
+          !myTurn()
+
+          ?
+
+          'Turn of '+opp.name+'.'
+
+          :
+
+          (
+            game.rollsLeft===3 &&
+            !game.rolledThisTurn
+
+            ?
+
+            'Your turn: roll the dice.'
+
+            :
+
+            game.rollsLeft>0
+
+            ?
+
+            'Keep desired dice. Rolls left: '+game.rollsLeft
+
+            :
+
+            'Choose a combination on the board.'
+          )
+        }
+
+      </div>
+
+
+      <div class="dice-tray">
+
+        ${diceHtml()}
+
+      </div>
+
+
+      <div class="controls">
+
+        <button
+          class="btn-primary"
+          onclick="rollDice()"
+          ${canRoll?'':'disabled'}
+        >
+          Roll Dice (${game.rollsLeft})
+        </button>
+
+      </div>
+
+
       <div class="controls-secondary">
-        <button class="btn-red" onclick="useChip()" ${canExtra?'':'disabled'}>Use Chip → 4th Roll</button>
-        <button class="btn-ghost" onclick="resetGame()">New Game</button>
+
+        <button
+          class="btn-red"
+          onclick="useChip()"
+          ${canExtra?'':'disabled'}
+        >
+          Use Chip → 4th Roll
+        </button>
+
+
+        <button
+          class="btn-ghost"
+          onclick="resetGame()"
+        >
+          New Game
+        </button>
+
       </div>
-      <div class="meta"><span>Your Chips: ${chipsHtml(me.id)}</span><span>${opp.name}'s Chips: ${chipsHtml(opp.id)}</span></div>
+
+
+      <div class="meta">
+
+        <span>
+          Your Chips:
+          ${chipsHtml(me.id)}
+        </span>
+
+        <span>
+          ${opp.name}'s Chips:
+          ${chipsHtml(opp.id)}
+        </span>
+
+      </div>
+    `;
+
+
+  // ==========================================================
+  // FINAL PAGE
+  // ==========================================================
+
+  app.innerHTML=`
+
+    <h1>Kniffel Extreme</h1>
+
+    <div class="board">
+
+      <div>
+        ${leftPanel}
+      </div>
+
+
+      <div>
+
+        <div class="card">
+
+          <table>
+
+            <thead>
+
+              <tr>
+
+                <th></th>
+
+                <th>${me.name}</th>
+
+                <th>${opp.name}</th>
+
+              </tr>
+
+            </thead>
+
+
+            <tbody>
+
+              ${upperRows}
+
+
+              <tr>
+
+                <td class="cat">
+                  Bonus (from 73)
+                </td>
+
+                <td class="score">
+                  ${bonus(me.id)??'–'}
+                </td>
+
+                <td class="score">
+                  ${bonus(opp.id)??'–'}
+                </td>
+
+              </tr>
+
+
+              <tr class="section-label">
+
+                <td colspan="3">
+                  Lower Section
+                </td>
+
+              </tr>
+
+
+              ${lowerRows}
+
+
+              <tr>
+
+                <td
+                  class="cat"
+                  style="font-weight:800"
+                >
+                  Total Score
+                </td>
+
+                <td
+                  class="score"
+                  style="font-weight:800"
+                >
+                  ${totalScore(me.id)}
+                </td>
+
+                <td
+                  class="score"
+                  style="font-weight:800"
+                >
+                  ${totalScore(opp.id)}
+                </td>
+
+              </tr>
+
+            </tbody>
+
+          </table>
+
+        </div>
+
+
+        <div class="card">
+
+          <label>Game Log</label>
+
+          <div class="log">
+
+            ${
+              game.log
+                .slice()
+                .reverse()
+                .map(l=>`<div>${l}</div>`)
+                .join('')
+            }
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
   `;
 
-  app.innerHTML = `
-    <h1>Kniffel Extreme</h1>
-    <div class="board">
-      <div>${leftPanel}</div>
-      <div>
-        <div class="card">
-          <table>
-            <thead><tr><th></th><th>${me.name}</th><th>${opp.name}</th></tr></thead>
-            <tbody>
-              ${upperRows}
-              <tr><td class="cat">Bonus (from 73)</td><td class="score">${bonus(me.id)??'–'}</td><td class="score">${bonus(opp.id)??'–'}</td></tr>
-              <tr class="section-label"><td colspan="3">Lower Section</td></tr>
-              ${lowerRows}
-              <tr><td class="cat" style="font-weight:800">Total Score</td><td class="score" style="font-weight:800">${totalScore(me.id)}</td><td class="score" style="font-weight:800">${totalScore(opp.id)}</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="card">
-          <label>Game Log</label>
-          <div class="log">${game.log.slice().reverse().map(l=>`<div>${l}</div>`).join('')}</div>
-        </div>
-      </div>
-    </div>
-  `;
 }
 
+
 render();
+
 </script>
+
 </body>
 </html>
+```
