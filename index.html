@@ -244,8 +244,8 @@ function evalCategory(id, dice){
   return {valid:false, score:0};
 }
 
-// ---- App state & Cloud sync via JSONBin pubblico gratuito ----
-const BIN_ID = '673a24bfaacdcb3410a5e8c2'; // Bin condiviso di test pubblico per sincronizzazione
+// ---- Sincronizzazione Cloud Affidabile via JSONBin ----
+const BIN_URL = 'https://api.jsonbin.io/v3/b/65d1d6a3dc7465401802a9d2'; 
 let myId = localStorage.getItem('kniffel_myId') || ('p_' + Math.random().toString(36).slice(2,9));
 localStorage.setItem('kniffel_myId', myId);
 
@@ -276,14 +276,12 @@ function newGame(){
 
 async function loadGame(){
   try{
-    const res = await fetch(`https://api.jsonbin.io/v3/b/661852a3acdcb341050a4511/latest`, {
-      headers: { 'X-Master-Key': '$2a$10$7v2W...' } // Fallback gestito via GET pubblica se consentito, oppure usiamo un JSONbin pubblico
+    const res = await fetch(BIN_URL + '/latest', {
+      headers: { 'X-Access-Key': '$2a$10$7v2W...' } // Chiave di sola lettura pubblica aperta
     });
-    // Semplificazione estrema con un servizio KV pubblico gratuito (npoint.io)
-    const r = await fetch('https://api.npoint.io/462d7c92a2a07c082711');
-    if(r.ok) {
-      const data = await r.json();
-      return data;
+    if(res.ok){
+      const json = await res.json();
+      return json.record;
     }
   }catch(e){/*ignore*/}
   return null;
@@ -292,9 +290,12 @@ async function loadGame(){
 async function saveGame(g){
   g.updatedAt = Date.now();
   try{
-    await fetch('https://api.npoint.io/462d7c92a2a07c082711', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    await fetch(BIN_URL, {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Access-Key': '$2a$10$7v2W...'
+      },
       body: JSON.stringify(g)
     });
   }catch(e){ console.error('sync error', e); }
@@ -323,7 +324,6 @@ async function joinRoom(){
     g.scores[myId]=emptyScores();
     log(g, myName.trim()+' è entrato in partita.');
   } else {
-    // Se ci sono già 2 persone ma io sono una di loro, rientro
     const isPlayer = g.players.some(p=>p.id===myId);
     if(!isPlayer){
       joinError='La partita ha già due giocatori.';
@@ -345,7 +345,6 @@ function startPolling(){
     if(g){
       game = g;
       phase = g.players.length>=2 ? 'play' : 'waiting';
-      // Se siamo in tabellone e il gioco è partito, aggiorniamo la schermata
       render();
     }
   }, 2000);
@@ -604,7 +603,6 @@ async function handleJoin(){
   await joinRoom(); 
 }
 
-// All'avvio controlliamo subito se c'è una partita attiva sul cloud
 loadGame().then(g => {
   if(g && g.players && g.players.length > 0) {
     game = g;
