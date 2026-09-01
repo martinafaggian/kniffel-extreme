@@ -284,7 +284,10 @@ roomRef.on('value', (snapshot) => {
     if(!game.chipsLeft) game.chipsLeft = {};
     if(!game.scores) game.scores = {};
     
-    phase = game.players.length>=2 ? 'play' : 'waiting';
+    // Crucial fix: Only jump to the game board IF the player has already chosen a name
+    if (phase !== 'join') {
+      phase = game.players.length >= 2 ? 'play' : 'waiting';
+    }
     render();
   }
 });
@@ -306,20 +309,23 @@ async function quickJoin(name){
   
   const existing = g.players.find(p=>p.name.toLowerCase()===name.toLowerCase());
   if(existing){
-    myId = existing.id;
-  } else if(g.players.length<2){
-    g.players.push({id:myId, name:name});
-    g.chipsLeft[myId]=3;
-    g.scores[myId]=emptyScores();
-    log(g, name+' joined the game.');
+    // If the player reconnects, reassign their original ID
+    myId = existing.id; 
+  } else if(g.players.length < 2){
+    g.players.push({id: myId, name: name});
+    g.chipsLeft[myId] = 3;
+    g.scores[myId] = emptyScores();
+    log(g, name + ' joined the game.');
   } else {
-    joinError='The room already has two players.';
+    joinError = 'The room already has two players.';
     render();
     return;
   }
   
+  // Now that a name is clicked, manually move away from the 'join' phase
+  phase = g.players.length >= 2 ? 'play' : 'waiting';
   await saveGame(g);
-  // Real-time listener will trigger render()
+  render();
 }
 
 function myTurn(){
