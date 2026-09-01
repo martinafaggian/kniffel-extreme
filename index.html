@@ -1,12 +1,11 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kniffel Extreme - P2P</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
-<!-- Importiamo PeerJS per la connessione diretta tra browser -->
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <style>
   :root{
@@ -171,26 +170,26 @@
 
 <script>
 const CATS = [
-  {id:'ones',   label:'Einser',  sec:'upper'},
-  {id:'twos',   label:'Zweier',  sec:'upper'},
-  {id:'threes', label:'Dreier',  sec:'upper'},
-  {id:'fours',  label:'Vierer',  sec:'upper'},
-  {id:'fives',  label:'Fünfer',  sec:'upper'},
-  {id:'sixes',  label:'Sechser', sec:'upper'},
-  {id:'tris',        label:'Dreierpasch',      sec:'lower'},
-  {id:'poker',       label:'Viererpasch',      sec:'lower'},
-  {id:'dueCoppie',   label:'Zwei Paare',       sec:'lower'},
-  {id:'treCoppie',   label:'Drei Paare',       sec:'lower'},
-  {id:'dueTris',     label:'Zwei Dreier',      sec:'lower'},
-  {id:'full',        label:'Full-House',       sec:'lower'},
-  {id:'grandeFull',  label:'Großes Full-House',sec:'lower'},
-  {id:'scalaCorta',  label:'Kleine Straße',    sec:'lower'},
-  {id:'scalaLunga',  label:'Große Straße',     sec:'lower'},
+  {id:'ones',   label:'Ones',  sec:'upper'},
+  {id:'twos',   label:'Twos',  sec:'upper'},
+  {id:'threes', label:'Threes',  sec:'upper'},
+  {id:'fours',  label:'Fours',  sec:'upper'},
+  {id:'fives',  label:'Fives',  sec:'upper'},
+  {id:'sixes',  label:'Sixes', sec:'upper'},
+  {id:'tris',        label:'Three of a kind',      sec:'lower'},
+  {id:'poker',       label:'Four of a kind',      sec:'lower'},
+  {id:'dueCoppie',   label:'Two Pairs',       sec:'lower'},
+  {id:'treCoppie',   label:'Three Pairs',       sec:'lower'},
+  {id:'dueTris',     label:'Two Threes',      sec:'lower'},
+  {id:'full',        label:'Full House',       sec:'lower'},
+  {id:'grandeFull',  label:'Large Full House',sec:'lower'},
+  {id:'scalaCorta',  label:'Small Straight',    sec:'lower'},
+  {id:'scalaLunga',  label:'Large Straight',     sec:'lower'},
   {id:'highway',     label:'Highway',          sec:'lower'},
   {id:'kniffel',        label:'Kniffel',          sec:'lower'},
   {id:'kniffelExtreme', label:'Kniffel Extreme',  sec:'lower'},
-  {id:'sommaMax10',  label:'10 oder weniger',  sec:'lower'},
-  {id:'sommaMin33',  label:'33 oder mehr',     sec:'lower'},
+  {id:'sommaMax10',  label:'10 or less',  sec:'lower'},
+  {id:'sommaMin33',  label:'33 or more',     sec:'lower'},
   {id:'chance',      label:'Chance',           sec:'lower'},
   {id:'superChance', label:'Super Chance',     sec:'lower'},
 ];
@@ -244,7 +243,7 @@ function evalCategory(id, dice){
   return {valid:false, score:0};
 }
 
-// ---- Stato P2P e Gioco ----
+// ---- P2P State & Game Logic ----
 let peer = null;
 let conn = null;
 let isHost = false;
@@ -288,13 +287,12 @@ function initPeer(customId = undefined){
 
 function hostGame(){
   myName = document.getElementById('nameInput').value.trim();
-  if(!myName){ joinError='Inserisci il tuo nome.'; render(); return; }
+  if(!myName){ joinError='Please enter your name.'; render(); return; }
   isHost = true;
   phase = 'waiting';
   render();
-  initPeer(); // Genera un ID casuale per la stanza
+  initPeer();
   
-  // Attende che il peer sia pronto per creare il player host
   setTimeout(()=>{
     game.players = [{id: myId, name: myName}];
     game.chipsLeft[myId] = 3;
@@ -305,7 +303,7 @@ function hostGame(){
 function joinGameModal(){
   myName = document.getElementById('nameInput').value.trim();
   targetRoomId = document.getElementById('roomInput').value.trim();
-  if(!myName || !targetRoomId){ joinError='Inserisci nome e codice stanza.'; render(); return; }
+  if(!myName || !targetRoomId){ joinError='Please enter name and room code.'; render(); return; }
   
   phase = 'waiting';
   render();
@@ -315,7 +313,6 @@ function joinGameModal(){
     conn = peer.connect(targetRoomId);
     setupConnection();
     conn.on('open', ()=>{
-      // Invia richiesta di ingresso
       conn.send({type: 'JOIN', name: myName, id: myId});
     });
   }, 1000);
@@ -325,22 +322,26 @@ function setupConnection(){
   conn.on('data', (data) => {
     if(isHost){
       if(data.type === 'JOIN'){
-        if(game.players.length < 2){
+        // Check to prevent duplicating players
+        const alreadyExists = game.players.some(p => p.id === data.id || p.name.toLowerCase() === data.name.toLowerCase());
+        
+        if(!alreadyExists && game.players.length < 2){
           const guest = {id: data.id, name: data.name};
           game.players.push(guest);
           game.chipsLeft[guest.id] = 3;
           game.scores[guest.id] = emptyScores();
-          log(game, guest.name + ' è entrato in partita.');
+          log(game, guest.name + ' joined the game.');
+          phase = 'play';
+          syncState();
+        } else if(alreadyExists) {
           phase = 'play';
           syncState();
         }
-      } else {
-        // L'ospite ha fatto un'azione, aggiorniamo lo stato locale dell'host
+      } else if(data.type === 'ACTION') {
         game = data.game;
         syncState();
       }
     } else {
-      // Sono l'ospite, ricevo lo stato aggiornato dall'host
       if(data.type === 'STATE'){
         game = data.game;
         phase = 'play';
@@ -379,7 +380,7 @@ function rollDice(){
   game.dice = d;
   game.rollsLeft -= 1;
   game.rolledThisTurn = true;
-  log(game, game.players[game.turnIndex].name+' ha lanciato i dadi.');
+  log(game, game.players[game.turnIndex].name + ' rolled the dice.');
   endAction();
 }
 
@@ -395,7 +396,7 @@ function useChip(){
   game.chipsLeft[myId] -= 1;
   game.rollsLeft = 1;
   game.usedExtraThisTurn = true;
-  log(game, game.players[game.turnIndex].name+' ha speso un gettone per un lancio extra.');
+  log(game, game.players[game.turnIndex].name + ' used an extra roll chip.');
   endAction();
 }
 
@@ -404,7 +405,7 @@ function chooseScore(catId){
   if(game.scores[myId][catId] !== null) return;
   const {score} = evalCategory(catId, game.dice);
   game.scores[myId][catId] = score;
-  log(game, game.players[game.turnIndex].name+' segna "'+CATS.find(c=>c.id===catId).label+'": '+score+' punti.');
+  log(game, game.players[game.turnIndex].name + ' scored "' + CATS.find(c=>c.id===catId).label + '": ' + score + ' points.');
   
   const bothDone = game.players.every(p => CATS.every(c => game.scores[p.id][c.id] !== null));
   if(bothDone){
@@ -424,14 +425,13 @@ function endAction(){
   if(isHost){
     syncState();
   } else {
-    // Invia l'azione all'host
     conn.send({type: 'ACTION', game: game});
     render();
   }
 }
 
 function resetGame(){
-  if(!confirm('Iniziare una nuova partita?')) return;
+  if(!confirm('Start a new game?')) return;
   const players = game.players;
   game = {
     players: players,
@@ -447,7 +447,7 @@ function resetGame(){
     rolledThisTurn: false
   };
   players.forEach(p=>{ game.chipsLeft[p.id]=3; game.scores[p.id]=emptyScores(); });
-  log(game, 'Nuova partita iniziata.');
+  log(game, 'New game started.');
   endAction();
 }
 
@@ -479,22 +479,22 @@ function render(){
   if(phase==='setup'){
     app.innerHTML = `
       <h1>Kniffel Extreme</h1>
-      <p class="sub">Connessione P2P diretta tra dispositivi</p>
+      <p class="sub">Direct P2P Connection Between Devices</p>
       <div class="card" style="max-width:420px;margin:0 auto">
         <div class="field">
-          <label>Il tuo nome</label>
-          <input type="text" id="nameInput" placeholder="Es. Martina">
+          <label>Your Name</label>
+          <input type="text" id="nameInput" placeholder="Ex. Martina">
         </div>
         ${joinError?`<div class="err">${joinError}</div>`:''}
         <div style="display:flex;gap:10px;margin-top:10px;">
-          <button class="btn-primary" onclick="hostGame()">Crea Stanza</button>
+          <button class="btn-primary" onclick="hostGame()">Create Room</button>
         </div>
         <hr style="border:0;border-top:1px solid rgba(244,239,223,0.15);margin:20px 0;">
         <div class="field">
-          <label>Codice Stanza dell'amica</label>
-          <input type="text" id="roomInput" placeholder="Incolla qui il codice">
+          <label>Friend's Room Code</label>
+          <input type="text" id="roomInput" placeholder="Paste code here">
         </div>
-        <button class="btn-ghost" style="width:100%" onclick="joinGameModal()">Unrati alla Stanza</button>
+        <button class="btn-ghost" style="width:100%" onclick="joinGameModal()">Join Room</button>
       </div>
     `;
     return;
@@ -504,8 +504,8 @@ function render(){
     app.innerHTML = `
       <h1>Kniffel Extreme</h1>
       <div class="card" style="text-align:center;max-width:420px;margin:0 auto">
-        <p style="font-family:'Fraunces',serif;font-size:18px;margin:0 0 6px">In attesa dell'altro giocatore...</p>
-        ${isHost ? `<div class="room-box">Fornisci questo codice alla tua amica:<div class="code-display" id="roomCodeDisplay">Generazione in corso...</div></div>` : '<p class="sub">Connessione in corso...</p>'}
+        <p style="font-family:'Fraunces',serif;font-size:18px;margin:0 0 6px">Waiting for the other player...</p>
+        ${isHost ? `<div class="room-box">Share this code with your friend:<div class="code-display" id="roomCodeDisplay">Generating...</div></div>` : '<p class="sub">Connecting...</p>'}
       </div>
     `;
     return;
@@ -527,24 +527,24 @@ function render(){
 
   const leftPanel = game.gameOver ? `
       <div class="card">
-        <div class="winner-banner">${totalScore(me.id)===totalScore(opp.id) ? 'Pareggio!' : (totalScore(me.id)>totalScore(opp.id) ? 'Hai vinto tu!' : opp.name+' ha vinto!')}</div>
-        <div class="meta"><span><b>${me.name}</b>: ${totalScore(me.id)} punti</span></div>
-        <div class="meta"><span><b>${opp.name}</b>: ${totalScore(opp.id)} punti</span></div>
-        <div style="text-align:center;margin-top:10px"><button class="btn-primary" onclick="resetGame()">Nuova partita</button></div>
+        <div class="winner-banner">${totalScore(me.id)===totalScore(opp.id) ? 'Draw!' : (totalScore(me.id)>totalScore(opp.id) ? 'You won!' : opp.name+' won!')}</div>
+        <div class="meta"><span><b>${me.name}</b>: ${totalScore(me.id)} points</span></div>
+        <div class="meta"><span><b>${opp.name}</b>: ${totalScore(opp.id)} points</span></div>
+        <div style="text-align:center;margin-top:10px"><button class="btn-primary" onclick="resetGame()">New Game</button></div>
       </div>
   ` : `
       <div class="players-row">
         <div class="avatar-wrap"><div class="avatar gold ${myTurn()?'turn':''}">${me.name.charAt(0).toUpperCase()}</div><div class="avatar-name ${myTurn()?'turn':''}">${me.name}</div></div>
         <div class="avatar-wrap"><div class="avatar red ${!myTurn()?'turn':''}">${opp.name.charAt(0).toUpperCase()}</div><div class="avatar-name ${!myTurn()?'turn':''}">${opp.name}</div></div>
       </div>
-      <div class="banner">${!myTurn() ? 'Turno di '+opp.name+'.' : (game.rollsLeft===3 && !game.rolledThisTurn ? 'Tocca a te: lancia i dadi.' : game.rollsLeft>0 ? 'Tieni i dadi desiderati. Lanci: '+game.rollsLeft : 'Scegli una combinazione sul tabellone.')}</div>
+      <div class="banner">${!myTurn() ? 'Turn of '+opp.name+'.' : (game.rollsLeft===3 && !game.rolledThisTurn ? 'Your turn: roll the dice.' : game.rollsLeft>0 ? 'Keep desired dice. Rolls left: '+game.rollsLeft : 'Choose a combination on the board.')}</div>
       <div class="dice-tray">${diceHtml()}</div>
-      <div class="controls"><button class="btn-primary" onclick="rollDice()" ${canRoll?'':'disabled'}>Lancia i dadi (${game.rollsLeft})</button></div>
+      <div class="controls"><button class="btn-primary" onclick="rollDice()" ${canRoll?'':'disabled'}>Roll Dice (${game.rollsLeft})</button></div>
       <div class="controls-secondary">
-        <button class="btn-red" onclick="useChip()" ${canExtra?'':'disabled'}>Gettone → 4° lancio</button>
-        <button class="btn-ghost" onclick="resetGame()">Nuova partita</button>
+        <button class="btn-red" onclick="useChip()" ${canExtra?'':'disabled'}>Use Chip → 4th Roll</button>
+        <button class="btn-ghost" onclick="resetGame()">New Game</button>
       </div>
-      <div class="meta"><span>Gettoni tu: ${chipsHtml(me.id)}</span><span>Gettoni ${opp.name}: ${chipsHtml(opp.id)}</span></div>
+      <div class="meta"><span>Your Chips: ${chipsHtml(me.id)}</span><span>${opp.name}'s Chips: ${chipsHtml(opp.id)}</span></div>
   `;
 
   app.innerHTML = `
@@ -557,15 +557,15 @@ function render(){
             <thead><tr><th></th><th>${me.name}</th><th>${opp.name}</th></tr></thead>
             <tbody>
               ${upperRows}
-              <tr><td class="cat">Bonus (ab 73)</td><td class="score">${bonus(me.id)??'–'}</td><td class="score">${bonus(opp.id)??'–'}</td></tr>
-              <tr class="section-label"><td colspan="3">Unterer Teil</td></tr>
+              <tr><td class="cat">Bonus (from 73)</td><td class="score">${bonus(me.id)??'–'}</td><td class="score">${bonus(opp.id)??'–'}</td></tr>
+              <tr class="section-label"><td colspan="3">Lower Section</td></tr>
               ${lowerRows}
-              <tr><td class="cat" style="font-weight:800">Endsumme</td><td class="score" style="font-weight:800">${totalScore(me.id)}</td><td class="score" style="font-weight:800">${totalScore(opp.id)}</td></tr>
+              <tr><td class="cat" style="font-weight:800">Total Score</td><td class="score" style="font-weight:800">${totalScore(me.id)}</td><td class="score" style="font-weight:800">${totalScore(opp.id)}</td></tr>
             </tbody>
           </table>
         </div>
         <div class="card">
-          <label>Cronologia</label>
+          <label>Game Log</label>
           <div class="log">${game.log.slice().reverse().map(l=>`<div>${l}</div>`).join('')}</div>
         </div>
       </div>
