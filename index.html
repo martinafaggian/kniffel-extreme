@@ -270,7 +270,36 @@ let game = {
 function emptyScores(){ const o={}; CATS.forEach(c=>o[c.id]=null); return o; }
 
 function initPeer(customId = undefined){
-  peer = new Peer(customId);
+  peer = new Peer(customId, {
+    config: {
+      iceServers: [
+      {
+        urls: "stun:stun.relay.metered.ca:80",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:80",
+        username: "2ac9c3102db1f9b1ad207da5",
+        credential: "5rr6cgpxngte+TkE",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:80?transport=tcp",
+        username: "2ac9c3102db1f9b1ad207da5",
+        credential: "5rr6cgpxngte+TkE",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:443",
+        username: "2ac9c3102db1f9b1ad207da5",
+        credential: "5rr6cgpxngte+TkE",
+      },
+      {
+        urls: "turns:global.relay.metered.ca:443?transport=tcp",
+        username: "2ac9c3102db1f9b1ad207da5",
+        credential: "5rr6cgpxngte+TkE",
+      },
+  ],
+    }
+  });
+
   peer.on('open', (id) => {
     myId = id;
     if(isHost) {
@@ -376,7 +405,7 @@ function rollDice(){
   if(!myTurn() || game.rollsLeft<=0 || game.gameOver) return;
   const d = game.dice.slice();
   for(let i=0;i<5;i++) if(!game.held[i]) d[i] = 1+Math.floor(Math.random()*6);
-  if(!game.held[5]) d[5] = 1+Math.floor(Math.random()*10);
+  if(!game.held[5]) d[5] = Math.floor(Math.random()*10);
   game.dice = d;
   game.rollsLeft -= 1;
   game.rolledThisTurn = true;
