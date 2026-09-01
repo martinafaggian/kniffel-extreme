@@ -1,11 +1,16 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kniffel Extreme</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+<!-- Firebase App (the core Firebase SDK) -->
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+<!-- Firebase Realtime Database -->
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
+
 <style>
   :root{
     --felt-dark:#123027;
@@ -130,38 +135,56 @@
 <div class="wrap" id="app"></div>
 
 <script>
+// ---- FIREBASE INIT ----
+const firebaseConfig = {
+  apiKey: "AIzaSyA5K-tyvfKVuPqf4w7-oyrgVgMUDb1oReE",
+  authDomain: "kniffel-extreme-16195.firebaseapp.com",
+  databaseURL: "https://kniffel-extreme-16195-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "kniffel-extreme-16195",
+  storageBucket: "kniffel-extreme-16195.firebasestorage.app",
+  messagingSenderId: "58458178290",
+  appId: "1:58458178290:web:ee30556e8c9916cdc2866b",
+  measurementId: "G-FX8PSZCWTP"
+};
+
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+const roomRef = database.ref('games/kniffel-shared-room');
+
+// ---- GAME LOGIC ----
 const PLAYER_NAMES = ['Lola','Martina'];
 
 const CATS = [
-  {id:'ones',   label:'Einser',  sec:'upper'},
-  {id:'twos',   label:'Zweier',  sec:'upper'},
-  {id:'threes', label:'Dreier',  sec:'upper'},
-  {id:'fours',  label:'Vierer',  sec:'upper'},
-  {id:'fives',  label:'Fünfer',  sec:'upper'},
-  {id:'sixes',  label:'Sechser', sec:'upper'},
-  {id:'tris',        label:'Dreierpasch',      sec:'lower'},
-  {id:'poker',       label:'Viererpasch',      sec:'lower'},
-  {id:'dueCoppie',   label:'Zwei Paare',       sec:'lower'},
-  {id:'treCoppie',   label:'Drei Paare',       sec:'lower'},
-  {id:'dueTris',     label:'Zwei Dreier',      sec:'lower'},
-  {id:'full',        label:'Full-House',       sec:'lower'},
-  {id:'grandeFull',  label:'Großes Full-House',sec:'lower'},
-  {id:'scalaCorta',  label:'Kleine Straße',    sec:'lower'},
-  {id:'scalaLunga',  label:'Große Straße',     sec:'lower'},
+  {id:'ones',   label:'Ones',  sec:'upper'},
+  {id:'twos',   label:'Twos',  sec:'upper'},
+  {id:'threes', label:'Threes',  sec:'upper'},
+  {id:'fours',  label:'Fours',  sec:'upper'},
+  {id:'fives',  label:'Fives',  sec:'upper'},
+  {id:'sixes',  label:'Sixes', sec:'upper'},
+  {id:'tris',        label:'Three of a kind',      sec:'lower'},
+  {id:'poker',       label:'Four of a kind',      sec:'lower'},
+  {id:'dueCoppie',   label:'Two Pairs',       sec:'lower'},
+  {id:'treCoppie',   label:'Three Pairs',       sec:'lower'},
+  {id:'dueTris',     label:'Two Threes',      sec:'lower'},
+  {id:'full',        label:'Full House',       sec:'lower'},
+  {id:'grandeFull',  label:'Large Full House',sec:'lower'},
+  {id:'scalaCorta',  label:'Small Straight',    sec:'lower'},
+  {id:'scalaLunga',  label:'Large Straight',     sec:'lower'},
   {id:'highway',     label:'Highway',          sec:'lower'},
   {id:'kniffel',        label:'Kniffel',          sec:'lower'},
   {id:'kniffelExtreme', label:'Kniffel Extreme',  sec:'lower'},
-  {id:'sommaMax10',  label:'10 oder weniger',  sec:'lower'},
-  {id:'sommaMin33',  label:'33 oder mehr',     sec:'lower'},
+  {id:'sommaMax10',  label:'10 or less',  sec:'lower'},
+  {id:'sommaMin33',  label:'33 or more',     sec:'lower'},
   {id:'chance',      label:'Chance',           sec:'lower'},
   {id:'superChance', label:'Super Chance',     sec:'lower'},
 ];
 
+// We use 0 instead of null because Firebase drops null array values
 function counts(dice){
   const c={};
-  dice.slice(0,5).forEach(v=>{ if(v!==null) c[v]=(c[v]||0)+1; });
+  dice.slice(0,5).forEach(v=>{ if(v!==0) c[v]=(c[v]||0)+1; });
   const r=dice[5];
-  if(r!==null && r>=1 && r<=6) c[r]=(c[r]||0)+1;
+  if(r!==0 && r>=1 && r<=6) c[r]=(c[r]||0)+1;
   return c;
 }
 function sumAll(dice){return dice.reduce((a,b)=>a+(b||0),0);}
@@ -207,21 +230,20 @@ function evalCategory(id, dice){
 }
 
 // ---- App state ----
-const ROOM_KEY = 'kniffel-extreme:shared-game';
 let myId = 'p_' + Math.random().toString(36).slice(2,9);
 let myName = '';
 let game = null;
-let pollTimer = null;
 let phase = 'join'; // join | waiting | play
 let joinError = '';
 
-function emptyScores(){ const o={}; CATS.forEach(c=>o[c.id]=null); return o; }
+// We use -1 instead of null for scores so Firebase doesn't delete the keys
+function emptyScores(){ const o={}; CATS.forEach(c=>o[c.id]= -1); return o; }
 
 function newGame(){
   return {
     players: [],
     turnIndex: 0,
-    dice: [null,null,null,null,null,null],
+    dice: [0,0,0,0,0,0],
     held: [false,false,false,false,false,false],
     rollsLeft: 3,
     usedExtraThisTurn: false,
@@ -234,59 +256,70 @@ function newGame(){
   };
 }
 
-async function loadGame(){
-  try{
-    const res = await window.storage.get(ROOM_KEY, true);
-    return res ? JSON.parse(res.value) : null;
-  }catch(e){ return null; }
-}
 async function saveGame(g){
   g.updatedAt = Date.now();
-  try{ await window.storage.set(ROOM_KEY, JSON.stringify(g), true); }
-  catch(e){ console.error('storage error', e); }
+  try{ 
+    await roomRef.set(g); 
+  } catch(e){ 
+    console.error('Firebase storage error', e); 
+  }
 }
+
 function log(g, text){
+  if(!g.log) g.log = [];
   g.log.push(text);
   if(g.log.length>40) g.log.shift();
 }
 
+// Subscribe to Firebase real-time updates
+roomRef.on('value', (snapshot) => {
+  const data = snapshot.val();
+  if (data) {
+    game = data;
+    // Firebase drops empty arrays, ensure they exist locally
+    if(!game.players) game.players = [];
+    if(!game.dice) game.dice = [0,0,0,0,0,0];
+    if(!game.held) game.held = [false,false,false,false,false,false];
+    if(!game.log) game.log = [];
+    if(!game.chipsLeft) game.chipsLeft = {};
+    if(!game.scores) game.scores = {};
+    
+    phase = game.players.length>=2 ? 'play' : 'waiting';
+    render();
+  }
+});
+
 async function quickJoin(name){
   myName = name;
   joinError='';
-  let g = await loadGame();
-  if(!g){ g = newGame(); }
+  
+  const snapshot = await roomRef.once('value');
+  let g = snapshot.val();
+  
+  if(!g){ 
+    g = newGame(); 
+  } else {
+    if(!g.players) g.players = [];
+    if(!g.chipsLeft) g.chipsLeft = {};
+    if(!g.scores) g.scores = {};
+  }
+  
   const existing = g.players.find(p=>p.name.toLowerCase()===name.toLowerCase());
   if(existing){
     myId = existing.id;
-  } else if(g.players.some(p=>p.name.toLowerCase()===name.toLowerCase())){
-    // unreachable, kept for clarity
   } else if(g.players.length<2){
     g.players.push({id:myId, name:name});
     g.chipsLeft[myId]=3;
     g.scores[myId]=emptyScores();
-    log(g, name+' e entrata in partita.');
+    log(g, name+' joined the game.');
   } else {
-    joinError='La partita ha gia due giocatrici.';
+    joinError='The room already has two players.';
     render();
     return;
   }
+  
   await saveGame(g);
-  game = g;
-  phase = g.players.length>=2 ? 'play' : 'waiting';
-  startPolling();
-  render();
-}
-
-function startPolling(){
-  if(pollTimer) clearInterval(pollTimer);
-  pollTimer = setInterval(async ()=>{
-    const g = await loadGame();
-    if(g){
-      game = g;
-      phase = g.players.length>=2 ? 'play' : 'waiting';
-      render();
-    }
-  }, 2000);
+  // Real-time listener will trigger render()
 }
 
 function myTurn(){
@@ -306,16 +339,14 @@ async function rollDice(){
   game.dice = d;
   game.rollsLeft -= 1;
   game.rolledThisTurn = true;
-  log(game, game.players[game.turnIndex].name+' ha lanciato i dadi.');
+  log(game, game.players[game.turnIndex].name+' rolled the dice.');
   await saveGame(game);
-  render();
 }
 
-function toggleHold(i){
+async function toggleHold(i){
   if(!myTurn() || !game.rolledThisTurn || game.gameOver) return;
   game.held[i] = !game.held[i];
-  saveGame(game);
-  render();
+  await saveGame(game);
 }
 
 async function useChip(){
@@ -324,49 +355,47 @@ async function useChip(){
   game.chipsLeft[myId] -= 1;
   game.rollsLeft = 1;
   game.usedExtraThisTurn = true;
-  log(game, game.players[game.turnIndex].name+' ha speso un gettone per un lancio extra.');
+  log(game, game.players[game.turnIndex].name+' used a chip for an extra roll.');
   await saveGame(game);
-  render();
 }
 
 async function chooseScore(catId){
   if(!myTurn() || !game.rolledThisTurn || game.gameOver) return;
-  if(game.scores[myId][catId] !== null) return;
+  if(game.scores[myId][catId] !== -1) return;
+  
   const {score} = evalCategory(catId, game.dice);
   game.scores[myId][catId] = score;
-  log(game, game.players[game.turnIndex].name+' segna "'+CATS.find(c=>c.id===catId).label+'": '+score+' punti.');
-  const bothDone = game.players.every(p => CATS.every(c => game.scores[p.id][c.id] !== null));
+  log(game, game.players[game.turnIndex].name+' scored "'+CATS.find(c=>c.id===catId).label+'": '+score+' points.');
+  
+  const bothDone = game.players.every(p => CATS.every(c => game.scores[p.id][c.id] !== -1));
   if(bothDone){
     game.gameOver = true;
   } else {
     game.turnIndex = (game.turnIndex+1) % game.players.length;
-    game.dice = [null,null,null,null,null,null];
+    game.dice = [0,0,0,0,0,0];
     game.held = [false,false,false,false,false,false];
     game.rollsLeft = 3;
     game.usedExtraThisTurn = false;
     game.rolledThisTurn = false;
   }
   await saveGame(game);
-  render();
 }
 
 async function resetGame(){
   if(!game) return;
-  if(!confirm('Iniziare una nuova partita? I punteggi attuali andranno persi.')) return;
+  if(!confirm('Start a new game? Current scores will be lost.')) return;
   const players = game.players;
   const g = newGame();
   g.players = players;
   players.forEach(p=>{ g.chipsLeft[p.id]=3; g.scores[p.id]=emptyScores(); });
-  log(g, 'Nuova partita iniziata.');
+  log(g, 'New game started.');
   await saveGame(g);
-  game = g;
-  render();
 }
 
-function upperSum(pid){ return CATS.filter(c=>c.sec==='upper').reduce((s,c)=> s + (game.scores[pid][c.id]||0), 0); }
-function upperAllFilled(pid){ return CATS.filter(c=>c.sec==='upper').every(c=> game.scores[pid][c.id] !== null); }
+function upperSum(pid){ return CATS.filter(c=>c.sec==='upper').reduce((s,c)=> s + (game.scores[pid][c.id] === -1 ? 0 : game.scores[pid][c.id]), 0); }
+function upperAllFilled(pid){ return CATS.filter(c=>c.sec==='upper').every(c=> game.scores[pid][c.id] !== -1); }
 function bonus(pid){ if(!upperAllFilled(pid)) return null; return upperSum(pid) >= 73 ? 45 : 0; }
-function lowerSum(pid){ return CATS.filter(c=>c.sec==='lower').reduce((s,c)=> s + (game.scores[pid][c.id]||0), 0); }
+function lowerSum(pid){ return CATS.filter(c=>c.sec==='lower').reduce((s,c)=> s + (game.scores[pid][c.id] === -1 ? 0 : game.scores[pid][c.id]), 0); }
 function totalScore(pid){ const b = bonus(pid); return upperSum(pid) + (b||0) + lowerSum(pid); }
 
 const ROTATIONS = [-9, 7, -4, 11, -13, 5];
@@ -374,7 +403,7 @@ function diceHtml(){
   const d = game.dice;
   return d.map((v,i)=>{
     const isRed = i===5;
-    const empty = v===null;
+    const empty = v === 0;
     const held = game.held[i];
     const cls = ['die'];
     if(isRed) cls.push('red');
@@ -386,10 +415,11 @@ function diceHtml(){
 }
 
 function scoreCell(pid, cat){
+  if(!game.scores || !game.scores[pid]) return `<td></td>`;
   const val = game.scores[pid][cat.id];
   const isMine = pid===myId;
-  const canPick = isMine && myTurn() && game.rolledThisTurn && !game.gameOver && val===null;
-  if(val!==null) return `<td class="score">${val}</td>`;
+  const canPick = isMine && myTurn() && game.rolledThisTurn && !game.gameOver && val === -1;
+  if(val !== -1) return `<td class="score">${val}</td>`;
   if(canPick) return `<td class="score mine" onclick="chooseScore('${cat.id}')"><span class="empty-preview">–</span></td>`;
   return `<td class="score"><span class="empty-preview">–</span></td>`;
 }
@@ -405,10 +435,10 @@ function avatarHtml(player, colorClass, isTurn){
 }
 
 function bannerText(){
-  if(!myTurn()) return 'Turno di '+game.players[game.turnIndex].name+'. Attendi il tuo turno.';
-  if(game.rollsLeft===3 && !game.rolledThisTurn) return 'Tocca a te: lancia i dadi.';
-  if(game.rollsLeft>0) return 'Clicca sui dadi che vuoi tenere. Hai '+game.rollsLeft+' lanci rimasti.';
-  return 'Scegli una combinazione sul tabellone per segnare il punteggio.';
+  if(!myTurn()) return 'Turn of '+game.players[game.turnIndex].name+'. Please wait.';
+  if(game.rollsLeft===3 && !game.rolledThisTurn) return 'Your turn: roll the dice.';
+  if(game.rollsLeft>0) return 'Click the dice you want to keep. Rolls left: '+game.rollsLeft;
+  return 'Choose a combination on the board to score.';
 }
 
 function render(){
@@ -417,9 +447,9 @@ function render(){
   if(phase==='join'){
     app.innerHTML = `
       <h1>Kniffel Extreme</h1>
-      <p class="sub">6 dadi (5 bianchi + 1 rosso a 10 facce), 22 combinazioni, gettoni per il lancio extra.</p>
+      <p class="sub">6 dice (5 white + 1 red), 22 combinations, extra roll chips.</p>
       <div class="card" style="max-width:420px;margin:0 auto">
-        <label>Chi sei?</label>
+        <label>Who are you?</label>
         <div class="picker" style="margin-top:10px">
           <button class="btn-primary" onclick="quickJoin('${PLAYER_NAMES[0]}')">${PLAYER_NAMES[0]}</button>
           <button class="btn-primary" onclick="quickJoin('${PLAYER_NAMES[1]}')">${PLAYER_NAMES[1]}</button>
@@ -434,8 +464,8 @@ function render(){
     app.innerHTML = `
       <h1>Kniffel Extreme</h1>
       <div class="card" style="text-align:center;max-width:420px;margin:0 auto">
-        <p style="font-family:'Fraunces',serif;font-size:18px;margin:0 0 6px">In attesa che si unisca l'altra giocatrice...</p>
-        <p class="sub" style="margin:0">Fai aprire questa stessa pagina sull'altro dispositivo e far scegliere il proprio nome.</p>
+        <p style="font-family:'Fraunces',serif;font-size:18px;margin:0 0 6px">Waiting for the other player to join...</p>
+        <p class="sub" style="margin:0">Ask the other player to open this same page and pick their name.</p>
       </div>
     `;
     return;
@@ -464,10 +494,10 @@ function render(){
 
   const leftPanel = game.gameOver ? `
       <div class="card">
-        <div class="winner-banner">${totalScore(me.id)===totalScore(opp.id) ? 'Pareggio!' : (totalScore(me.id)>totalScore(opp.id) ? 'Hai vinto tu!' : opp.name+' ha vinto!')}</div>
-        <div class="meta"><span><b>${me.name}</b>: ${totalScore(me.id)} punti</span></div>
-        <div class="meta"><span><b>${opp.name}</b>: ${totalScore(opp.id)} punti</span></div>
-        <div style="text-align:center;margin-top:10px"><button class="btn-primary" onclick="resetGame()">Nuova partita</button></div>
+        <div class="winner-banner">${totalScore(me.id)===totalScore(opp.id) ? 'Draw!' : (totalScore(me.id)>totalScore(opp.id) ? 'You won!' : opp.name+' won!')}</div>
+        <div class="meta"><span><b>${me.name}</b>: ${totalScore(me.id)} points</span></div>
+        <div class="meta"><span><b>${opp.name}</b>: ${totalScore(opp.id)} points</span></div>
+        <div style="text-align:center;margin-top:10px"><button class="btn-primary" onclick="resetGame()">New Game</button></div>
       </div>
   ` : `
       <div class="players-row">
@@ -477,15 +507,15 @@ function render(){
       <div class="banner">${bannerText()}</div>
       <div class="dice-tray">${diceHtml()}</div>
       <div class="controls">
-        <button class="btn-primary" onclick="rollDice()" ${canRoll?'':'disabled'}>Lancia i dadi (${game.rollsLeft})</button>
+        <button class="btn-primary" onclick="rollDice()" ${canRoll?'':'disabled'}>Roll Dice (${game.rollsLeft})</button>
       </div>
       <div class="controls-secondary">
-        <button class="btn-red" onclick="useChip()" ${canExtra?'':'disabled'}>Gettone → 4° lancio</button>
-        <button class="btn-ghost" onclick="resetGame()">Nuova partita</button>
+        <button class="btn-red" onclick="useChip()" ${canExtra?'':'disabled'}>Use Chip → 4th Roll</button>
+        <button class="btn-ghost" onclick="resetGame()">New Game</button>
       </div>
       <div class="meta">
-        <span>Gettoni tu: ${chipsHtml(me.id)}</span>
-        <span>Gettoni ${opp.name}: ${chipsHtml(opp.id)}</span>
+        <span>Your Chips: ${chipsHtml(me.id)}</span>
+        <span>${opp.name}'s Chips: ${chipsHtml(opp.id)}</span>
       </div>
   `;
 
@@ -499,15 +529,15 @@ function render(){
             <thead><tr><th></th><th>${me.name}</th><th>${opp.name}</th></tr></thead>
             <tbody>
               ${upperRows}
-              <tr><td class="cat">Bonus (ab 73)</td><td class="score">${bonusMineVal===null?'<span class="empty-preview">–</span>':bonusMineVal}</td><td class="score">${bonusOppVal===null?'<span class="empty-preview">–</span>':bonusOppVal}</td></tr>
-              <tr class="section-label"><td colspan="3">Unterer Teil</td></tr>
+              <tr><td class="cat">Bonus (from 73)</td><td class="score">${bonusMineVal===null?'<span class="empty-preview">–</span>':bonusMineVal}</td><td class="score">${bonusOppVal===null?'<span class="empty-preview">–</span>':bonusOppVal}</td></tr>
+              <tr class="section-label"><td colspan="3">Lower Section</td></tr>
               ${lowerRows}
-              <tr><td class="cat" style="font-weight:800">Endsumme</td><td class="score" style="font-weight:800">${totalScore(me.id)}</td><td class="score" style="font-weight:800">${totalScore(opp.id)}</td></tr>
+              <tr><td class="cat" style="font-weight:800">Total Score</td><td class="score" style="font-weight:800">${totalScore(me.id)}</td><td class="score" style="font-weight:800">${totalScore(opp.id)}</td></tr>
             </tbody>
           </table>
         </div>
         <div class="card">
-          <label>Cronologia</label>
+          <label>Game Log</label>
           <div class="log">${game.log.slice().reverse().map(l=>`<div>${l}</div>`).join('')}</div>
         </div>
       </div>
