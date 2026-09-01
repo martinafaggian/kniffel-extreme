@@ -3,9 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kniffel Extreme</title>
+<title>Kniffel Extreme - P2P</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+<!-- Importiamo PeerJS per la connessione diretta tra browser -->
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <style>
   :root{
     --felt-dark:#123027;
@@ -160,6 +162,8 @@
     text-align:center;font-family:'Fraunces',serif;font-size:24px;font-weight:700;
     color:var(--gold);margin-bottom:8px;
   }
+  .room-box{background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;margin-top:10px;text-align:center;font-size:14px;}
+  .code-display{font-family:monospace;font-size:18px;color:var(--banner);font-weight:bold;margin:4px 0;}
 </style>
 </head>
 <body>
@@ -225,129 +229,137 @@ function evalCategory(id, dice){
     case 'dueCoppie': { const pairVals = keys.filter(k=>c[k]>=2); const v = pairVals.length>=2; return {valid:v, score:v?sum:0}; }
     case 'treCoppie': { const pairVals = keys.filter(k=>c[k]>=2); const v=pairVals.length>=3; return {valid:v, score:v?35:0}; }
     case 'dueTris': { const trisVals = keys.filter(k=>c[k]>=3); const v=trisVals.length>=2; return {valid:v, score:v?45:0}; }
-    case 'full': { const sorted=vals.slice().sort((a,b)=>a-b); const v = sorted.length===2 && sorted[0]===2 && sorted[1]===3; return {valid:v, score:v?25:0}; }
-    case 'grandeFull': {
-      const hasFour = keys.some(k=>c[k]>=4);
-      const v = hasFour && keys.filter(k=>c[k]>=2).length>=2;
-      return {valid:v, score:v?45:0};
-    }
+    case 'full': { const sorted=vals.slice().sort((a,b)=>a-b); return {valid:sorted.length===2 && sorted[0]===2 && sorted[1]===3, score:25}; }
+    case 'grandeFull': { const hasFour=keys.some(k=>c[k]>=4); const v=hasFour && keys.filter(k=>c[k]>=2).length>=2; return {valid:v, score:v?45:0}; }
     case 'scalaCorta': { const v=consecutiveRun(keys,4); return {valid:v, score:v?30:0}; }
     case 'scalaLunga': { const v=consecutiveRun(keys,5); return {valid:v, score:v?40:0}; }
-    case 'highway': { const v = keys.length===6 && keys.every(k=>c[k]===1) && keys[0]===1 && keys[5]===6; return {valid:v, score:v?50:0}; }
-    case 'kniffel': { const v = max>=5; return {valid:v, score:v?50:0}; }
-    case 'kniffelExtreme': { const v = max===6; return {valid:v, score:v?75:0}; }
-    case 'sommaMax10': { const v = sum<=10; return {valid:v, score:v?40:0}; }
-    case 'sommaMin33': { const v = sum>=33; return {valid:v, score:v?40:0}; }
+    case 'highway': { const v=keys.length===6 && keys.every(k=>c[k]===1) && keys[0]===1 && keys[5]===6; return {valid:v, score:v?50:0}; }
+    case 'kniffel': { const v=max>=5; return {valid:v, score:v?50:0}; }
+    case 'kniffelExtreme': { const v=max===6; return {valid:v, score:v?75:0}; }
+    case 'sommaMax10': { const v=sum<=10; return {valid:v, score:v?40:0}; }
+    case 'sommaMin33': { const v=sum>=33; return {valid:v, score:v?40:0}; }
     case 'chance': return {valid:true, score:sum};
     case 'superChance': return {valid:true, score:sum*2};
   }
   return {valid:false, score:0};
 }
 
-// ---- Sincronizzazione Cloud Affidabile via JSONBin ----
-const BIN_URL = 'https://api.jsonbin.io/v3/b/65d1d6a3dc7465401802a9d2'; 
-let myId = localStorage.getItem('kniffel_myId') || ('p_' + Math.random().toString(36).slice(2,9));
-localStorage.setItem('kniffel_myId', myId);
-
-let myName = localStorage.getItem('kniffel_myName') || '';
-let game = null;
-let pollTimer = null;
-let phase = 'join';
+// ---- Stato P2P e Gioco ----
+let peer = null;
+let conn = null;
+let isHost = false;
+let myId = 'p_' + Math.random().toString(36).slice(2,9);
+let myName = '';
+let targetRoomId = '';
+let phase = 'setup'; // setup | waiting | play
 let joinError = '';
+
+let game = {
+  players: [],
+  turnIndex: 0,
+  dice: [null,null,null,null,null,null],
+  held: [false,false,false,false,false,false],
+  rollsLeft: 3,
+  usedExtraThisTurn: false,
+  chipsLeft: {},
+  scores: {},
+  log: [],
+  gameOver: false,
+  rolledThisTurn: false
+};
 
 function emptyScores(){ const o={}; CATS.forEach(c=>o[c.id]=null); return o; }
 
-function newGame(){
-  return {
-    players: [],
-    turnIndex: 0,
-    dice: [null,null,null,null,null,null],
-    held: [false,false,false,false,false,false],
-    rollsLeft: 3,
-    usedExtraThisTurn: false,
-    chipsLeft: {},
-    scores: {},
-    log: [],
-    gameOver: false,
-    rolledThisTurn: false,
-    updatedAt: Date.now()
-  };
-}
-
-async function loadGame(){
-  try{
-    const res = await fetch(BIN_URL + '/latest', {
-      headers: { 'X-Access-Key': '$2a$10$7v2W...' } // Chiave di sola lettura pubblica aperta
-    });
-    if(res.ok){
-      const json = await res.json();
-      return json.record;
+function initPeer(customId = undefined){
+  peer = new Peer(customId);
+  peer.on('open', (id) => {
+    myId = id;
+    if(isHost) {
+      document.getElementById('roomCodeDisplay').innerText = id;
     }
-  }catch(e){/*ignore*/}
-  return null;
+  });
+
+  peer.on('connection', (c) => {
+    conn = c;
+    setupConnection();
+    isHost = true;
+  });
 }
 
-async function saveGame(g){
-  g.updatedAt = Date.now();
-  try{
-    await fetch(BIN_URL, {
-      method: 'PUT',
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-Access-Key': '$2a$10$7v2W...'
-      },
-      body: JSON.stringify(g)
+function hostGame(){
+  myName = document.getElementById('nameInput').value.trim();
+  if(!myName){ joinError='Inserisci il tuo nome.'; render(); return; }
+  isHost = true;
+  phase = 'waiting';
+  render();
+  initPeer(); // Genera un ID casuale per la stanza
+  
+  // Attende che il peer sia pronto per creare il player host
+  setTimeout(()=>{
+    game.players = [{id: myId, name: myName}];
+    game.chipsLeft[myId] = 3;
+    game.scores[myId] = emptyScores();
+  }, 500);
+}
+
+function joinGameModal(){
+  myName = document.getElementById('nameInput').value.trim();
+  targetRoomId = document.getElementById('roomInput').value.trim();
+  if(!myName || !targetRoomId){ joinError='Inserisci nome e codice stanza.'; render(); return; }
+  
+  phase = 'waiting';
+  render();
+  initPeer();
+
+  setTimeout(()=>{
+    conn = peer.connect(targetRoomId);
+    setupConnection();
+    conn.on('open', ()=>{
+      // Invia richiesta di ingresso
+      conn.send({type: 'JOIN', name: myName, id: myId});
     });
-  }catch(e){ console.error('sync error', e); }
+  }, 1000);
+}
+
+function setupConnection(){
+  conn.on('data', (data) => {
+    if(isHost){
+      if(data.type === 'JOIN'){
+        if(game.players.length < 2){
+          const guest = {id: data.id, name: data.name};
+          game.players.push(guest);
+          game.chipsLeft[guest.id] = 3;
+          game.scores[guest.id] = emptyScores();
+          log(game, guest.name + ' è entrato in partita.');
+          phase = 'play';
+          syncState();
+        }
+      } else {
+        // L'ospite ha fatto un'azione, aggiorniamo lo stato locale dell'host
+        game = data.game;
+        syncState();
+      }
+    } else {
+      // Sono l'ospite, ricevo lo stato aggiornato dall'host
+      if(data.type === 'STATE'){
+        game = data.game;
+        phase = 'play';
+        render();
+      }
+    }
+  });
+}
+
+function syncState(){
+  if(isHost && conn){
+    conn.send({type: 'STATE', game: game});
+  }
+  render();
 }
 
 function log(g, text){
   g.log.push(text);
   if(g.log.length>40) g.log.shift();
-}
-
-async function joinRoom(){
-  joinError='';
-  if(!myName.trim()){ joinError='Inserisci il tuo nome.'; render(); return; }
-  localStorage.setItem('kniffel_myName', myName.trim());
-  
-  let g = await loadGame();
-  if(!g){ g = newGame(); }
-  
-  const existing = g.players.find(p=>p.id===myId || p.name.toLowerCase()===myName.trim().toLowerCase());
-  if(existing){
-    myId = existing.id;
-    localStorage.setItem('kniffel_myId', myId);
-  } else if(g.players.length<2){
-    g.players.push({id:myId, name:myName.trim()});
-    g.chipsLeft[myId]=3;
-    g.scores[myId]=emptyScores();
-    log(g, myName.trim()+' è entrato in partita.');
-  } else {
-    const isPlayer = g.players.some(p=>p.id===myId);
-    if(!isPlayer){
-      joinError='La partita ha già due giocatori.';
-      render();
-      return;
-    }
-  }
-  await saveGame(g);
-  game = g;
-  phase = g.players.length>=2 ? 'play' : 'waiting';
-  startPolling();
-  render();
-}
-
-function startPolling(){
-  if(pollTimer) clearInterval(pollTimer);
-  pollTimer = setInterval(async ()=>{
-    const g = await loadGame();
-    if(g){
-      game = g;
-      phase = g.players.length>=2 ? 'play' : 'waiting';
-      render();
-    }
-  }, 2000);
 }
 
 function myTurn(){
@@ -359,7 +371,7 @@ function opponent(){
   return game.players.find(p=>p.id!==myId) || null;
 }
 
-async function rollDice(){
+function rollDice(){
   if(!myTurn() || game.rollsLeft<=0 || game.gameOver) return;
   const d = game.dice.slice();
   for(let i=0;i<5;i++) if(!game.held[i]) d[i] = 1+Math.floor(Math.random()*6);
@@ -368,34 +380,32 @@ async function rollDice(){
   game.rollsLeft -= 1;
   game.rolledThisTurn = true;
   log(game, game.players[game.turnIndex].name+' ha lanciato i dadi.');
-  await saveGame(game);
-  render();
+  endAction();
 }
 
 function toggleHold(i){
   if(!myTurn() || !game.rolledThisTurn || game.gameOver) return;
   game.held[i] = !game.held[i];
-  saveGame(game);
-  render();
+  endAction();
 }
 
-async function useChip(){
+function useChip(){
   if(!myTurn() || game.rollsLeft>0 || game.usedExtraThisTurn || game.gameOver) return;
   if((game.chipsLeft[myId]||0)<=0) return;
   game.chipsLeft[myId] -= 1;
   game.rollsLeft = 1;
   game.usedExtraThisTurn = true;
   log(game, game.players[game.turnIndex].name+' ha speso un gettone per un lancio extra.');
-  await saveGame(game);
-  render();
+  endAction();
 }
 
-async function chooseScore(catId){
+function chooseScore(catId){
   if(!myTurn() || !game.rolledThisTurn || game.gameOver) return;
   if(game.scores[myId][catId] !== null) return;
   const {score} = evalCategory(catId, game.dice);
   game.scores[myId][catId] = score;
   log(game, game.players[game.turnIndex].name+' segna "'+CATS.find(c=>c.id===catId).label+'": '+score+' punti.');
+  
   const bothDone = game.players.every(p => CATS.every(c => game.scores[p.id][c.id] !== null));
   if(bothDone){
     game.gameOver = true;
@@ -407,107 +417,86 @@ async function chooseScore(catId){
     game.usedExtraThisTurn = false;
     game.rolledThisTurn = false;
   }
-  await saveGame(game);
-  render();
+  endAction();
 }
 
-async function resetGame(){
-  if(!game) return;
-  if(!confirm('Iniziare una nuova partita? I punteggi attuali andranno persi.')) return;
+function endAction(){
+  if(isHost){
+    syncState();
+  } else {
+    // Invia l'azione all'host
+    conn.send({type: 'ACTION', game: game});
+    render();
+  }
+}
+
+function resetGame(){
+  if(!confirm('Iniziare una nuova partita?')) return;
   const players = game.players;
-  const g = newGame();
-  g.players = players;
-  players.forEach(p=>{ g.chipsLeft[p.id]=3; g.scores[p.id]=emptyScores(); });
-  log(g, 'Nuova partita iniziata.');
-  await saveGame(g);
-  game = g;
-  render();
+  game = {
+    players: players,
+    turnIndex: 0,
+    dice: [null,null,null,null,null,null],
+    held: [false,false,false,false,false,false],
+    rollsLeft: 3,
+    usedExtraThisTurn: false,
+    chipsLeft: {},
+    scores: {},
+    log: [],
+    gameOver: false,
+    rolledThisTurn: false
+  };
+  players.forEach(p=>{ game.chipsLeft[p.id]=3; game.scores[p.id]=emptyScores(); });
+  log(game, 'Nuova partita iniziata.');
+  endAction();
 }
 
-function upperSum(pid){
-  return CATS.filter(c=>c.sec==='upper').reduce((s,c)=> s + (game.scores[pid][c.id]||0), 0);
-}
-function upperAllFilled(pid){
-  return CATS.filter(c=>c.sec==='upper').every(c=> game.scores[pid][c.id] !== null);
-}
-function bonus(pid){
-  if(!upperAllFilled(pid)) return null;
-  return upperSum(pid) >= 73 ? 45 : 0;
-}
-function lowerSum(pid){
-  return CATS.filter(c=>c.sec==='lower').reduce((s,c)=> s + (game.scores[pid][c.id]||0), 0);
-}
-function totalScore(pid){
-  const b = bonus(pid);
-  return upperSum(pid) + (b||0) + lowerSum(pid);
-}
+function upperSum(pid){ return CATS.filter(c=>c.sec==='upper').reduce((s,c)=> s + (game.scores[pid][c.id]||0), 0); }
+function upperAllFilled(pid){ return CATS.filter(c=>c.sec==='upper').every(c=> game.scores[pid][c.id] !== null); }
+function bonus(pid){ if(!upperAllFilled(pid)) return null; return upperSum(pid) >= 73 ? 45 : 0; }
+function lowerSum(pid){ return CATS.filter(c=>c.sec==='lower').reduce((s,c)=> s + (game.scores[pid][c.id]||0), 0); }
+function totalScore(pid){ return upperSum(pid) + (bonus(pid)||0) + lowerSum(pid); }
 
 const ROTATIONS = [-9, 7, -4, 11, -13, 5];
 function diceHtml(){
-  const d = game.dice;
-  return d.map((v,i)=>{
-    const isRed = i===5;
-    const empty = v===null;
-    const held = game.held[i];
-    const cls = ['die'];
-    if(isRed) cls.push('red');
-    if(held) cls.push('held');
-    if(empty) cls.push('empty');
-    const rot = empty ? 0 : ROTATIONS[i];
-    return `<div class="${cls.join(' ')}" style="transform:rotate(${rot}deg)${held?' translateY(6px)':''}" ${empty?'':`onclick="toggleHold(${i})"`}>${empty?'':v}</div>`;
+  return game.dice.map((v,i)=>{
+    const isRed = i===5, empty = v===null, held = game.held[i];
+    const cls = ['die', isRed?'red':'', held?'held':'', empty?'empty':''].join(' ');
+    return `<div class="${cls}" style="transform:rotate(${empty?0:ROTATIONS[i]}deg)${held?' translateY(6px)':''}" ${empty?'':`onclick="toggleHold(${i})"`}>${empty?'':v}</div>`;
   }).join('');
 }
 
 function scoreCell(pid, cat){
   const val = game.scores[pid][cat.id];
-  const isMine = pid===myId;
-  const canPick = isMine && myTurn() && game.rolledThisTurn && !game.gameOver && val===null;
+  const canPick = pid===myId && myTurn() && game.rolledThisTurn && !game.gameOver && val===null;
   if(val!==null) return `<td class="score">${val}</td>`;
-  if(canPick){
-    return `<td class="score mine" onclick="chooseScore('${cat.id}')"><span class="empty-preview">–</span></td>`;
-  }
+  if(canPick) return `<td class="score mine" onclick="chooseScore('${cat.id}')"><span class="empty-preview">–</span></td>`;
   return `<td class="score"><span class="empty-preview">–</span></td>`;
-}
-
-function avatarHtml(player, colorClass, isTurn){
-  const initial = player.name.trim().charAt(0).toUpperCase() || '?';
-  return `
-    <div class="avatar-wrap">
-      <div class="avatar ${colorClass} ${isTurn?'turn':''}">${initial}</div>
-      <div class="avatar-name ${isTurn?'turn':''}">${player.name}</div>
-    </div>
-  `;
-}
-
-function bannerText(me){
-  if(!myTurn()){
-    return 'Turno di '+game.players[game.turnIndex].name+'. Attendi il tuo turno.';
-  }
-  if(game.rollsLeft===3 && !game.rolledThisTurn){
-    return 'Tocca a te: lancia i dadi.';
-  }
-  if(game.rollsLeft>0){
-    return 'Clicca sui dadi che vuoi tenere. Hai '+game.rollsLeft+' lanci rimasti.';
-  }
-  return 'Scegli una combinazione sul tabellone per segnare il punteggio.';
 }
 
 function render(){
   const app = document.getElementById('app');
-  if(phase==='join'){
+  if(phase==='setup'){
     app.innerHTML = `
       <h1>Kniffel Extreme</h1>
-      <p class="sub">6 dadi (5 bianchi + 1 rosso a 10 facce), 22 combinazioni, gettoni per il lancio extra.</p>
+      <p class="sub">Connessione P2P diretta tra dispositivi</p>
       <div class="card" style="max-width:420px;margin:0 auto">
         <div class="field">
           <label>Il tuo nome</label>
-          <input type="text" id="nameInput" placeholder="Es. Martina" value="${myName}">
+          <input type="text" id="nameInput" placeholder="Es. Martina">
         </div>
         ${joinError?`<div class="err">${joinError}</div>`:''}
-        <button class="btn-primary" onclick="handleJoin()">Entra in partita</button>
+        <div style="display:flex;gap:10px;margin-top:10px;">
+          <button class="btn-primary" onclick="hostGame()">Crea Stanza</button>
+        </div>
+        <hr style="border:0;border-top:1px solid rgba(244,239,223,0.15);margin:20px 0;">
+        <div class="field">
+          <label>Codice Stanza dell'amica</label>
+          <input type="text" id="roomInput" placeholder="Incolla qui il codice">
+        </div>
+        <button class="btn-ghost" style="width:100%" onclick="joinGameModal()">Unrati alla Stanza</button>
       </div>
     `;
-    document.getElementById('nameInput').oninput = e=>myName=e.target.value;
     return;
   }
 
@@ -515,8 +504,8 @@ function render(){
     app.innerHTML = `
       <h1>Kniffel Extreme</h1>
       <div class="card" style="text-align:center;max-width:420px;margin:0 auto">
-        <p style="font-family:'Fraunces',serif;font-size:18px;margin:0 0 6px">In attesa che si unisca il secondo giocatore...</p>
-        <p class="sub" style="margin:0">Condividi questo link con la tua amica e inserite entrambi i vostri nomi.</p>
+        <p style="font-family:'Fraunces',serif;font-size:18px;margin:0 0 6px">In attesa dell'altro giocatore...</p>
+        ${isHost ? `<div class="room-box">Fornisci questo codice alla tua amica:<div class="code-display" id="roomCodeDisplay">Generazione in corso...</div></div>` : '<p class="sub">Connessione in corso...</p>'}
       </div>
     `;
     return;
@@ -526,21 +515,13 @@ function render(){
   const opp = opponent() || game.players[1];
   const canRoll = myTurn() && game.rollsLeft>0 && !game.gameOver;
   const canExtra = myTurn() && game.rollsLeft===0 && !game.usedExtraThisTurn && (game.chipsLeft[myId]||0)>0 && !game.gameOver;
-  const meIsTurn = myTurn();
 
-  const upperRows = CATS.filter(c=>c.sec==='upper').map(c=>`
-    <tr><td class="cat">${c.label}</td>${scoreCell(me.id,c)}${scoreCell(opp.id,c)}</tr>
-  `).join('');
-  const bonusMineVal = bonus(me.id);
-  const bonusOppVal = bonus(opp.id);
-  const lowerRows = CATS.filter(c=>c.sec==='lower').map(c=>`
-    <tr><td class="cat">${c.label}</td>${scoreCell(me.id,c)}${scoreCell(opp.id,c)}</tr>
-  `).join('');
-
+  const upperRows = CATS.filter(c=>c.sec==='upper').map(c=>`<tr><td class="cat">${c.label}</td>${scoreCell(me.id,c)}${scoreCell(opp.id,c)}</tr>`).join('');
+  const lowerRows = CATS.filter(c=>c.sec==='lower').map(c=>`<tr><td class="cat">${c.label}</td>${scoreCell(me.id,c)}${scoreCell(opp.id,c)}</tr>`).join('');
+  
   const chipsHtml = (pid)=>{
     const used = 3-(game.chipsLeft[pid]||0);
-    let s='';
-    for(let i=0;i<3;i++) s += `<span class="chip ${i<used?'spent':''}"></span>`;
+    let s=''; for(let i=0;i<3;i++) s += `<span class="chip ${i<used?'spent':''}"></span>`;
     return s;
   };
 
@@ -549,28 +530,21 @@ function render(){
         <div class="winner-banner">${totalScore(me.id)===totalScore(opp.id) ? 'Pareggio!' : (totalScore(me.id)>totalScore(opp.id) ? 'Hai vinto tu!' : opp.name+' ha vinto!')}</div>
         <div class="meta"><span><b>${me.name}</b>: ${totalScore(me.id)} punti</span></div>
         <div class="meta"><span><b>${opp.name}</b>: ${totalScore(opp.id)} punti</span></div>
-        <div style="text-align:center;margin-top:10px">
-          <button class="btn-primary" onclick="resetGame()">Nuova partita</button>
-        </div>
+        <div style="text-align:center;margin-top:10px"><button class="btn-primary" onclick="resetGame()">Nuova partita</button></div>
       </div>
   ` : `
       <div class="players-row">
-        ${avatarHtml(me, 'gold', meIsTurn)}
-        ${avatarHtml(opp, 'red', !meIsTurn)}
+        <div class="avatar-wrap"><div class="avatar gold ${myTurn()?'turn':''}">${me.name.charAt(0).toUpperCase()}</div><div class="avatar-name ${myTurn()?'turn':''}">${me.name}</div></div>
+        <div class="avatar-wrap"><div class="avatar red ${!myTurn()?'turn':''}">${opp.name.charAt(0).toUpperCase()}</div><div class="avatar-name ${!myTurn()?'turn':''}">${opp.name}</div></div>
       </div>
-      <div class="banner">${bannerText(me)}</div>
+      <div class="banner">${!myTurn() ? 'Turno di '+opp.name+'.' : (game.rollsLeft===3 && !game.rolledThisTurn ? 'Tocca a te: lancia i dadi.' : game.rollsLeft>0 ? 'Tieni i dadi desiderati. Lanci: '+game.rollsLeft : 'Scegli una combinazione sul tabellone.')}</div>
       <div class="dice-tray">${diceHtml()}</div>
-      <div class="controls">
-        <button class="btn-primary" onclick="rollDice()" ${canRoll?'':'disabled'}>Lancia i dadi (${game.rollsLeft})</button>
-      </div>
+      <div class="controls"><button class="btn-primary" onclick="rollDice()" ${canRoll?'':'disabled'}>Lancia i dadi (${game.rollsLeft})</button></div>
       <div class="controls-secondary">
         <button class="btn-red" onclick="useChip()" ${canExtra?'':'disabled'}>Gettone → 4° lancio</button>
         <button class="btn-ghost" onclick="resetGame()">Nuova partita</button>
       </div>
-      <div class="meta">
-        <span>Gettoni tu: ${chipsHtml(me.id)}</span>
-        <span>Gettoni ${opp.name}: ${chipsHtml(opp.id)}</span>
-      </div>
+      <div class="meta"><span>Gettoni tu: ${chipsHtml(me.id)}</span><span>Gettoni ${opp.name}: ${chipsHtml(opp.id)}</span></div>
   `;
 
   app.innerHTML = `
@@ -583,7 +557,7 @@ function render(){
             <thead><tr><th></th><th>${me.name}</th><th>${opp.name}</th></tr></thead>
             <tbody>
               ${upperRows}
-              <tr><td class="cat">Bonus (ab 73)</td><td class="score">${bonusMineVal===null?'<span class="empty-preview">–</span>':bonusMineVal}</td><td class="score">${bonusOppVal===null?'<span class="empty-preview">–</span>':bonusOppVal}</td></tr>
+              <tr><td class="cat">Bonus (ab 73)</td><td class="score">${bonus(me.id)??'–'}</td><td class="score">${bonus(opp.id)??'–'}</td></tr>
               <tr class="section-label"><td colspan="3">Unterer Teil</td></tr>
               ${lowerRows}
               <tr><td class="cat" style="font-weight:800">Endsumme</td><td class="score" style="font-weight:800">${totalScore(me.id)}</td><td class="score" style="font-weight:800">${totalScore(opp.id)}</td></tr>
@@ -599,22 +573,7 @@ function render(){
   `;
 }
 
-async function handleJoin(){ 
-  await joinRoom(); 
-}
-
-loadGame().then(g => {
-  if(g && g.players && g.players.length > 0) {
-    game = g;
-    const found = g.players.find(p => p.id === myId);
-    if(found){
-      myName = found.name;
-      phase = g.players.length >= 2 ? 'play' : 'waiting';
-      startPolling();
-    }
-  }
-  render();
-});
+render();
 </script>
 </body>
 </html>
