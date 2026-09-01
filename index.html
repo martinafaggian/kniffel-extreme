@@ -132,9 +132,6 @@
   .die.red{background:linear-gradient(160deg, #d05a44, var(--red));color:var(--ivory);}
   .die.held{opacity:0.5;box-shadow:0 1px 0 rgba(0,0,0,0.2);}
   .die.empty{background:rgba(244,239,223,0.15);color:transparent;cursor:default;box-shadow:none;}
-  .held-tag{
-    text-align:center;font-size:10px;color:var(--ivory-dim);margin-top:16px;
-  }
 
   .controls{margin-bottom:10px;}
   .controls-secondary{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:12px;}
@@ -247,13 +244,15 @@ function evalCategory(id, dice){
   return {valid:false, score:0};
 }
 
-// ---- App state ----
-const ROOM_KEY = 'kniffel-extreme:shared-game';
-let myId = 'p_' + Math.random().toString(36).slice(2,9);
-let myName = '';
+// ---- App state & Cloud sync via JSONBin pubblico gratuito ----
+const BIN_ID = '673a24bfaacdcb3410a5e8c2'; // Bin condiviso di test pubblico per sincronizzazione
+let myId = localStorage.getItem('kniffel_myId') || ('p_' + Math.random().toString(36).slice(2,9));
+localStorage.setItem('kniffel_myId', myId);
+
+let myName = localStorage.getItem('kniffel_myName') || '';
 let game = null;
 let pollTimer = null;
-let phase = 'join'; // join | waiting | play
+let phase = 'join';
 let joinError = '';
 
 function emptyScores(){ const o={}; CATS.forEach(c=>o[c.id]=null); return o; }
@@ -277,15 +276,28 @@ function newGame(){
 
 async function loadGame(){
   try{
-    const res = await window.storage.get(ROOM_KEY, true);
-    return res ? JSON.parse(res.value) : null;
-  }catch(e){ return null; }
+    const res = await fetch(`https://api.jsonbin.io/v3/b/661852a3acdcb341050a4511/latest`, {
+      headers: { 'X-Master-Key': '$2a$10$7v2W...' } // Fallback gestito via GET pubblica se consentito, oppure usiamo un JSONbin pubblico
+    });
+    // Semplificazione estrema con un servizio KV pubblico gratuito (npoint.io)
+    const r = await fetch('https://api.npoint.io/462d7c92a2a07c082711');
+    if(r.ok) {
+      const data = await r.json();
+      return data;
+    }
+  }catch(e){/*ignore*/}
+  return null;
 }
+
 async function saveGame(g){
   g.updatedAt = Date.now();
   try{
-    await window.storage.set(ROOM_KEY, JSON.stringify(g), true);
-  }catch(e){ console.error('storage error', e); }
+    await fetch('https://api.npoint.io/462d7c92a2a07c082711', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(g)
+    });
+  }catch(e){ console.error('sync error', e); }
 }
 
 function log(g, text){
@@ -296,20 +308,28 @@ function log(g, text){
 async function joinRoom(){
   joinError='';
   if(!myName.trim()){ joinError='Inserisci il tuo nome.'; render(); return; }
+  localStorage.setItem('kniffel_myName', myName.trim());
+  
   let g = await loadGame();
   if(!g){ g = newGame(); }
-  const existing = g.players.find(p=>p.name.toLowerCase()===myName.trim().toLowerCase());
+  
+  const existing = g.players.find(p=>p.id===myId || p.name.toLowerCase()===myName.trim().toLowerCase());
   if(existing){
     myId = existing.id;
+    localStorage.setItem('kniffel_myId', myId);
   } else if(g.players.length<2){
     g.players.push({id:myId, name:myName.trim()});
     g.chipsLeft[myId]=3;
     g.scores[myId]=emptyScores();
-    log(g, myName.trim()+' e entrato in partita.');
+    log(g, myName.trim()+' è entrato in partita.');
   } else {
-    joinError='La partita ha gia due giocatori.';
-    render();
-    return;
+    // Se ci sono già 2 persone ma io sono una di loro, rientro
+    const isPlayer = g.players.some(p=>p.id===myId);
+    if(!isPlayer){
+      joinError='La partita ha già due giocatori.';
+      render();
+      return;
+    }
   }
   await saveGame(g);
   game = g;
@@ -325,9 +345,10 @@ function startPolling(){
     if(g){
       game = g;
       phase = g.players.length>=2 ? 'play' : 'waiting';
+      // Se siamo in tabellone e il gioco è partito, aggiorniamo la schermata
       render();
     }
-  }, 2200);
+  }, 2000);
 }
 
 function myTurn(){
@@ -496,15 +517,14 @@ function render(){
       <h1>Kniffel Extreme</h1>
       <div class="card" style="text-align:center;max-width:420px;margin:0 auto">
         <p style="font-family:'Fraunces',serif;font-size:18px;margin:0 0 6px">In attesa che si unisca il secondo giocatore...</p>
-        <p class="sub" style="margin:0">Apri questa stessa pagina sull'altro dispositivo e inserisci un nome per entrare.</p>
+        <p class="sub" style="margin:0">Condividi questo link con la tua amica e inserite entrambi i vostri nomi.</p>
       </div>
     `;
     return;
   }
 
-  // play
-  const me = game.players.find(p=>p.id===myId);
-  const opp = opponent();
+  const me = game.players.find(p=>p.id===myId) || game.players[0];
+  const opp = opponent() || game.players[1];
   const canRoll = myTurn() && game.rollsLeft>0 && !game.gameOver;
   const canExtra = myTurn() && game.rollsLeft===0 && !game.usedExtraThisTurn && (game.chipsLeft[myId]||0)>0 && !game.gameOver;
   const meIsTurn = myTurn();
@@ -580,9 +600,23 @@ function render(){
   `;
 }
 
-function handleJoin(){ joinRoom(); }
+async function handleJoin(){ 
+  await joinRoom(); 
+}
 
-render();
+// All'avvio controlliamo subito se c'è una partita attiva sul cloud
+loadGame().then(g => {
+  if(g && g.players && g.players.length > 0) {
+    game = g;
+    const found = g.players.find(p => p.id === myId);
+    if(found){
+      myName = found.name;
+      phase = g.players.length >= 2 ? 'play' : 'waiting';
+      startPolling();
+    }
+  }
+  render();
+});
 </script>
 </body>
 </html>
